@@ -61,16 +61,32 @@
         </div>
 
         <div class="section">
+          <label class="label" for="f-search">ค้นหาสถานที่หรือที่อยู่</label>
+          <div class="search-row">
+            <input id="f-search" class="field" placeholder="เช่น ดอยอินทนนท์, วัดพระแก้ว" autocomplete="off" enterkeyhint="search">
+            <button type="button" id="btn-addr" class="pill">ค้นหา</button>
+          </div>
+          <small id="addr-hint" class="hint">พิมพ์ชื่อหรือที่อยู่ แล้วกดค้นหา ระบบจะหาพิกัดและจังหวัดให้</small>
+        </div>
+
+        <div class="section">
           <span class="label">หมวดหมู่</span>
           <div id="form-cats" class="cat-grid"></div>
         </div>
 
         <div class="section">
-          <label class="label" for="f-prov">จังหวัด</label>
-          <div class="select-wrap">
+          <span class="label">จังหวัด</span>
+          <div class="prov-box">
+            <div class="prov-now">
+              <strong id="prov-name">ยังไม่ระบุ</strong>
+              <small id="prov-hint" class="hint"></small>
+            </div>
+            <button type="button" id="btn-prov-change" class="link">เปลี่ยน</button>
+          </div>
+          <div id="prov-picker" class="select-wrap" hidden>
+            <label class="sr" for="f-prov">เลือกจังหวัด</label>
             <select id="f-prov" name="province" class="field select"><option value="">— เลือกจังหวัด —</option></select>
           </div>
-          <small id="prov-hint" class="hint"></small>
         </div>
 
         <div class="section">

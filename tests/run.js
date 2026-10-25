@@ -143,6 +143,7 @@ function loadApp(gas) {
   const alerts = [];
   const confirmAnswer = { v: true };
   const nominatimReply = { v: { address: {} } };
+  const nominatimSearch = { v: [] };
 
   const mkClassList = () => {
     const s = new Set();
@@ -234,6 +235,7 @@ function loadApp(gas) {
 
   const fetchStub = async (url, opts = {}) => {
     const u = String(url);
+    if (u.includes('nominatim') && u.includes('/search')) return { json: async () => nominatimSearch.v };
     if (u.includes('nominatim')) return { json: async () => nominatimReply.v };
     const out = opts.method === 'POST'
       ? gas.ctx.doPost({ postData: { contents: opts.body } })
@@ -275,6 +277,7 @@ function loadApp(gas) {
     alerts,
     confirmAnswer,
     nominatimReply,
+    nominatimSearch,
     markers: () => layers[0].markers,
     viewCalls,
     myMarkers: () => layers[1]?.markers || [],
@@ -384,6 +387,30 @@ async function main() {
   await flush();
   check('ตรวจจังหวัดอัตโนมัติจากพิกัด (ตัดคำว่า "จังหวัด" ออก)', app.fields.province.value === 'เชียงใหม่', app.fields.province.value);
   check('มีข้อความบอกว่าตรวจจากพิกัดแล้ว', app.html('prov-hint').includes('ตรวจจากพิกัด'));
+  check('แสดงชื่อจังหวัดที่ตรวจได้ โดยไม่ต้องเลือกเอง', app.html('prov-name').includes('เชียงใหม่'));
+  check('รายการจังหวัดถูกซ่อนไว้ตอนตรวจได้แล้ว', app.els['prov-picker'].hidden === true);
+
+  // ค้นหาสถานที่: ได้พิกัดและจังหวัดจากคำค้น
+  app.els['f-search'].value = 'ดอยอินทนนท์';
+  app.nominatimSearch.v = [{ lat: '18.588', lon: '98.486', display_name: 'ดอยอินทนนท์' }];
+  app.nominatimReply.v = { address: { state: 'จังหวัดเชียงใหม่' } };
+  await app.els['btn-addr'].dispatch('click');
+  await flush();
+  check('ค้นหาแล้วได้พิกัดจากผลค้นหา', app.fields.lat.value === '18.588000', app.fields.lat.value);
+  check('ค้นหาแล้วจังหวัดถูกตรวจให้', app.fields.province.value === 'เชียงใหม่', app.fields.province.value);
+  app.nominatimSearch.v = [];
+  app.els['f-search'].value = 'ไม่มีสถานที่นี้จริง';
+  await app.els['btn-addr'].dispatch('click');
+  await flush();
+  check('ค้นหาไม่เจอจะแจ้งผู้ใช้', app.html('addr-hint').includes('ไม่พบสถานที่'));
+  check('ค้นหาไม่เจอไม่ทับพิกัดเดิม', app.fields.lat.value === '18.588000', app.fields.lat.value);
+
+  // เปลี่ยนจังหวัดเองได้ผ่านปุ่ม "เปลี่ยน"
+  await app.els['btn-prov-change'].dispatch('click');
+  check('กดเปลี่ยนแล้วเปิดรายการจังหวัด', app.els['prov-picker'].hidden === false);
+  // คืนพิกัดเดิมจากการปักหมุด เพื่อให้เทสต์ส่วนหมุดด้านล่างยังถูกต้อง
+  app.fields.lat.value = '18.790000';
+  app.fields.lng.value = '98.980000';
 
   app.fields.name.value = 'ดอยสุเทพ';
   app.fields.description.value = 'วิวเมือง';
@@ -566,6 +593,8 @@ async function main() {
   app.mapH.click({ latlng: { lat: 19.0, lng: 99.0 } });
   app.fields.name.value = 'วัดร่องขุ่น';
   app.fields.province.value = 'เชียงราย';
+  await app.els['f-prov'].dispatch('change'); // ผู้ใช้เลือกเอง ต้องไม่ถูกการตรวจพิกัดที่ค้างอยู่ทับ
+  await flush();
   app.els['date-from'].value = '2026-11-10';
   await app.els['date-from'].dispatch('change');
   await app.els['photo-grid'].dispatch('change', { target: { type: 'file', files: [
