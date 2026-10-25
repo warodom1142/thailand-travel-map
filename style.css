@@ -320,36 +320,31 @@ body.sheet-open .fab { opacity: 0; pointer-events: none; transform: scale(0.8); 
   font-size: 14px;
   font-weight: 600;
 }
-.date-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
-.date-row .pill { padding: 0 16px; white-space: nowrap; }
-.check {
+.date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.date-field { display: flex; flex-direction: column; gap: 4px; }
+.date-field small { font-size: 12px; color: var(--muted); font-weight: 600; }
+.date-summary {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  margin-top: 14px;
-  font-size: 15px;
-  cursor: pointer;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-weight: 600;
 }
-.check input { width: 20px; height: 20px; accent-color: var(--accent); }
-.stay-box { margin-top: 10px; }
-.date-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.date-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 6px 6px 12px;
+.link { color: var(--accent); font-size: 14px; font-weight: 600; padding: 4px; }
+.when {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  display: inline-block;
   border-radius: 99px;
   background: #eef2ff;
   color: #3730a3;
   font-size: 14px;
-}
-.date-chip.static { padding: 6px 12px; }
-.date-chip button {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(55, 48, 163, 0.15);
-  font-size: 10px;
+  font-weight: 600;
 }
 .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .tile { position: relative; aspect-ratio: 1; border-radius: 14px; overflow: hidden; background: var(--field); }

@@ -223,8 +223,7 @@ function openDetail(id) {
       <span class="badge" style="--c:${c.color}">${c.emoji} ${esc(c.name)}</span>
       <h2>${esc(p.name)}</h2>
       ${meta ? `<p class="sub">${meta}</p>` : ''}
-      ${days.length ? `<div class="date-chips">${days.map(d =>
-        `<span class="date-chip static">${fmtDate(d)}</span>`).join('')}</div>` : ''}
+      ${days.length ? `<p class="when">📅 ${esc(fmtRange(days))}${days.length > 1 ? ` · ${days.length} วัน` : ''}</p>` : ''}
       ${p.description ? `<p class="desc">${esc(p.description)}</p>` : ''}
       <div class="detail-actions">
         <a class="btn primary" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}" target="_blank" rel="noopener">🧭 นำทาง</a>
@@ -316,71 +315,66 @@ function rangeDays(a, b) {
   return out;
 }
 
-function renderDates() {
-  $('date-chips').innerHTML = dates.length
-    ? dates.map(d =>
-        `<span class="date-chip">${fmtDate(d)}<button type="button" data-d="${d}" aria-label="ลบวันนี้">✕</button></span>`
-      ).join('')
-    : '<span class="hint">ยังไม่ได้เลือกวัน</span>';
-}
-
 // ---------- วันที่ไป ----------
-function clearDateInputs() {
-  $('date-from').value = '';
-  $('date-to').value = '';
-  $('stay-toggle').checked = false;
-  $('stay-box').hidden = true;
+const TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+// แสดงวันที่แบบ "9–12 ต.ค. 69" (ปี พ.ศ. 2 หลัก)
+function fmtRange(list) {
+  if (!list.length) return '';
+  const ds = list.map(d => new Date(d + 'T00:00:00'));
+  const first = ds[0];
+  const last = ds.at(-1);
+  const contiguous = ds.length === Math.round((last - first) / 86400000) + 1;
+  if (!contiguous) return list.map(fmtDate).join(', ');
+  const yy = d => String((d.getFullYear() + 543) % 100).padStart(2, '0');
+  const mon = d => TH_MONTHS[d.getMonth()];
+  if (ds.length === 1) return `${first.getDate()} ${mon(first)} ${yy(first)}`;
+  if (first.getFullYear() === last.getFullYear() && first.getMonth() === last.getMonth()) {
+    return `${first.getDate()}–${last.getDate()} ${mon(last)} ${yy(last)}`;
+  }
+  if (first.getFullYear() === last.getFullYear()) {
+    return `${first.getDate()} ${mon(first)} – ${last.getDate()} ${mon(last)} ${yy(last)}`;
+  }
+  return `${first.getDate()} ${mon(first)} ${yy(first)} – ${last.getDate()} ${mon(last)} ${yy(last)}`;
 }
 
-// แปลงค่าในช่องกรอกเป็นรายการวัน (วันเดียว หรือทั้งช่วงถ้าติ๊กค้างคืน)
-function pendingDates() {
+// true เมื่อผู้ใช้แก้ช่องวันที่เอง (ถ้ายังไม่แก้ วันเดิมจะถูกเก็บไว้ตามเดิม)
+let dateTouched = false;
+let dateError = '';
+
+function renderDates() {
+  $('date-summary').textContent = fmtRange(dates) || 'ยังไม่ได้เลือกวัน';
+}
+
+function syncDateInputs() {
+  $('date-from').value = dates[0] || '';
+  $('date-to').value = dates.at(-1) || '';
+}
+
+// อ่านช่องจาก–ถึง แล้วสร้างรายการวัน (ถ้าไม่กรอกถึง = วันเดียว)
+function onDateChange() {
+  dateTouched = true;
   const from = $('date-from').value;
-  if (!from) return [];
-  const stay = $('stay-toggle').checked;
-  const to = stay ? $('date-to').value : '';
-  if (stay && !to) throw new Error('เลือก "ถึงวันที่" ด้วย หรือปิดตัวเลือกค้างคืน');
-  if (to && to < from) throw new Error('"ถึงวันที่" ต้องไม่ก่อนวันที่ไป');
-  return to ? rangeDays(from, to) : [from];
-}
-
-function addPendingDates() {
-  const add = pendingDates();
-  if (!add.length) return;
-  dates = [...new Set([...dates, ...add])].sort();
-  clearDateInputs();
+  const to = $('date-to').value || from;
+  if (from && to < from) {
+    dateError = 'ถึงวันที่ต้องไม่ก่อนวันที่ไป';
+    $('form-error').textContent = dateError;
+    return;
+  }
+  dateError = '';
+  $('form-error').textContent = '';
+  dates = from ? rangeDays(from, to) : [];
   renderDates();
 }
 
-function tryAddDates() {
-  try {
-    addPendingDates();
-    $('form-error').textContent = '';
-  } catch (err) {
-    $('form-error').textContent = err.message;
-  }
-}
-
-// เลือกวันเดียวแล้วเพิ่มเลย ไม่ต้องกดปุ่ม
-$('date-from').addEventListener('change', () => {
-  if (!$('stay-toggle').checked) tryAddDates();
-});
-$('date-to').addEventListener('change', tryAddDates);
-$('stay-toggle').addEventListener('change', e => {
-  $('stay-box').hidden = !e.target.checked;
-  if (!e.target.checked) $('date-to').value = '';
-});
-$('btn-add-date').addEventListener('click', () => {
-  if (!$('date-from').value) {
-    $('form-error').textContent = 'เลือกวันที่ก่อน';
-    return;
-  }
-  tryAddDates();
-});
-
-$('date-chips').addEventListener('click', e => {
-  const b = e.target.closest('[data-d]');
-  if (!b) return;
-  dates = dates.filter(d => d !== b.dataset.d);
+$('date-from').addEventListener('change', onDateChange);
+$('date-to').addEventListener('change', onDateChange);
+$('btn-clear-date').addEventListener('click', () => {
+  dates = [];
+  dateTouched = false;
+  dateError = '';
+  $('form-error').textContent = '';
+  syncDateInputs();
   renderDates();
 });
 
@@ -448,7 +442,9 @@ function openEditor(place = null, latlng = null) {
   renderStars();
 
   dates = splitDates(place?.visited);
-  clearDateInputs();
+  dateTouched = false;
+  dateError = '';
+  syncDateInputs();
   renderDates();
 
   keptPhotos = place ? [...place.photos] : [];
@@ -523,12 +519,7 @@ form.addEventListener('submit', async e => {
     return showFormError('ยังไม่มีพิกัด — แตะบนแผนที่เพื่อปักหมุด หรือเปิดหัวข้อพิกัดแล้วกรอกเอง');
   }
 
-  // วันที่ที่ยังค้างในช่องกรอกจะถูกเพิ่มให้อัตโนมัติก่อนบันทึก
-  try {
-    dates = [...new Set([...dates, ...pendingDates()])].sort();
-  } catch (err) {
-    return showFormError(err.message);
-  }
+  if (dateError) return showFormError(dateError);
 
   setSaving(true);
   try {

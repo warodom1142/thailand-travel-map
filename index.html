@@ -78,18 +78,20 @@
         <div class="section">
           <span class="label">วันที่ไป</span>
           <div class="date-row">
-            <input id="date-from" type="date" class="field" aria-label="วันที่ไป">
-            <button type="button" id="btn-add-date" class="pill">+ เพิ่มวัน</button>
+            <label class="date-field">
+              <small>จาก</small>
+              <input id="date-from" type="date" class="field">
+            </label>
+            <label class="date-field">
+              <small>ถึง</small>
+              <input id="date-to" type="date" class="field">
+            </label>
           </div>
-          <label class="check">
-            <input id="stay-toggle" type="checkbox">
-            <span>ค้างคืน (หลายวัน)</span>
-          </label>
-          <div id="stay-box" class="stay-box" hidden>
-            <input id="date-to" type="date" class="field" aria-label="ถึงวันที่">
+          <div class="date-summary">
+            <span id="date-summary">ยังไม่ได้เลือกวัน</span>
+            <button type="button" id="btn-clear-date" class="link">ล้าง</button>
           </div>
-          <div id="date-chips" class="date-chips"></div>
-          <small class="hint">เลือกวันเดียวแล้วจะเพิ่มให้ทันที ติ๊กค้างคืนเพื่อเลือกถึงวันที่</small>
+          <small class="hint">ถ้าไปวันเดียวใส่แค่ "จาก" ได้เลย</small>
         </div>
 
         <div class="section">

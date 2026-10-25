@@ -362,49 +362,37 @@ async function main() {
   check('กดดาวเดิมซ้ำเพื่อล้างคะแนน', get('rating') === 0);
   await app.els['form-stars'].dispatch('click', { target: tgt({ n: '4' }, '[data-n]') });
 
-  // วันเดียว: เลือกแล้วเพิ่มให้ทันที
+  // วันที่: ใส่ "จาก" อย่างเดียว = วันเดียว
   app.els['date-from'].value = '2026-10-25';
   await app.els['date-from'].dispatch('change');
-  check('เลือกวันเดียวแล้วเพิ่มเข้ารายการทันที', JSON.stringify(get('dates')) === '["2026-10-25"]', JSON.stringify(get('dates')));
-  check('ช่องวันถูกล้างหลังเพิ่ม', app.els['date-from'].value === '');
-  check('ชิปวันที่แสดงเป็นภาษาไทย', app.html('date-chips').includes('ต.ค.'), app.html('date-chips'));
+  check('ใส่แค่วันที่จาก = วันเดียว', JSON.stringify(get('dates')) === '["2026-10-25"]', JSON.stringify(get('dates')));
+  check('สรุปวันที่แสดงแบบ "25 ต.ค. 69"', app.html('date-summary') === '25 ต.ค. 69', app.html('date-summary'));
 
-  // ค้างคืน: ติ๊กแล้วเลือกถึงวันที่
-  app.els['stay-toggle'].checked = true;
-  await app.els['stay-toggle'].dispatch('change');
-  check('ติ๊กค้างคืนแล้วแสดงช่องถึงวันที่', app.els['stay-box'].hidden === false);
-  app.els['date-from'].value = '2026-10-27';
-  await app.els['date-from'].dispatch('change');
-  check('ค้างคืนยังไม่เพิ่มจนกว่าจะเลือกถึงวันที่', get('dates').length === 1);
+  // ใส่ "ถึง" = ทั้งช่วง
   app.els['date-to'].value = '2026-10-28';
   await app.els['date-to'].dispatch('change');
-  check('ค้างคืนเพิ่มทั้งช่วง (27–28)', JSON.stringify(get('dates')) === '["2026-10-25","2026-10-27","2026-10-28"]', JSON.stringify(get('dates')));
-  check('ปิดค้างคืนหลังเพิ่มแล้ว', app.els['stay-box'].hidden === true && app.els['stay-toggle'].checked === false);
+  check('ถึงวันที่ 28 = 4 วัน (25–28)', get('dates').length === 4, JSON.stringify(get('dates')));
+  check('สรุปเป็นช่วงแบบ "25–28 ต.ค. 69"', app.html('date-summary') === '25–28 ต.ค. 69', app.html('date-summary'));
 
-  // ค้างคืนแต่ไม่เลือกถึงวันที่
-  app.els['stay-toggle'].checked = true;
-  await app.els['stay-toggle'].dispatch('change');
-  app.els['date-from'].value = '2026-10-30';
-  app.els['date-to'].value = '';
-  await app.els['btn-add-date'].dispatch('click');
-  check('ค้างคืนไม่เลือกถึงวันที่ แสดงข้อความเตือน', app.html('form-error').includes('ถึงวันที่'), app.html('form-error'));
+  // ถึงก่อนจากต้องถูกปฏิเสธและไม่เปลี่ยนค่าเดิม
+  app.els['date-to'].value = '2026-10-24';
+  await app.els['date-to'].dispatch('change');
+  check('ถึงวันที่ก่อนวันที่จากถูกปฏิเสธ', app.html('form-error').includes('ต้องไม่ก่อน'), app.html('form-error'));
+  check('ค่าวันที่เดิมไม่เปลี่ยนเมื่อผิดพลาด', get('dates').length === 4);
 
-  // ถึงวันที่ก่อนวันที่ไป
-  app.els['date-to'].value = '2026-10-29';
-  await app.els['btn-add-date'].dispatch('click');
-  check('ถึงวันที่ก่อนวันที่ไปถูกปฏิเสธ', app.html('form-error').includes('ต้องไม่ก่อน'), app.html('form-error'));
-  app.els['stay-toggle'].checked = false;
-  await app.els['stay-toggle'].dispatch('change');
-  app.els['date-from'].value = '';
-  app.els['date-to'].value = '';
+  // แก้เป็นถึงวันที่ 27 = 3 วัน
+  app.els['date-to'].value = '2026-10-27';
+  await app.els['date-to'].dispatch('change');
+  check('แก้เป็นถึงวันที่ 27 = 3 วัน และล้างข้อความผิดพลาด', get('dates').length === 3 && app.html('form-error') === '');
+  check('สรุปหลังแก้ถูกต้อง', app.html('date-summary') === '25–27 ต.ค. 69', app.html('date-summary'));
 
-  // ปุ่ม + เพิ่มวัน ตอนไม่ได้เลือกวัน
-  await app.els['btn-add-date'].dispatch('click');
-  check('กด + เพิ่มวัน โดยไม่เลือกวัน แจ้งเตือน', app.html('form-error').includes('เลือกวันที่ก่อน'));
-
-  // วันที่ค้างในช่องแต่ยังไม่กดเพิ่ม ต้องถูกบันทึกด้วย
-  app.els['date-from'].value = '2026-12-31';
-  check('วันที่ค้างในช่องยังไม่เพิ่ม (ก่อนบันทึก)', get('dates').length === 3);
+  // ปุ่มล้างวัน
+  app.els['btn-clear-date'].dispatch('click');
+  check('ปุ่มล้างทำให้วันว่าง', get('dates').length === 0 && app.html('date-summary') === 'ยังไม่ได้เลือกวัน');
+  app.els['date-from'].value = '2026-10-25';
+  app.els['date-to'].value = '2026-10-27';
+  await app.els['date-to'].dispatch('change');
+  check('เลือกช่วงวันใหม่หลังล้าง', get('dates').length === 3);
 
   // รูปภาพ
   await app.els['photo-grid'].dispatch('change', { target: { type: 'file', files: [{ name: 'a.jpg' }], value: '' } });
@@ -417,11 +405,11 @@ async function main() {
   const afterAdd = listRaw().places;
   const added = afterAdd.find(p => p.name === 'ดอยสุเทพ');
   check('บันทึกสถานที่ใหม่ลง Sheet', !!added);
-  check('วันที่ที่บันทึกเรียงและไม่ซ้ำ', added?.visited === '2026-10-25,2026-10-27,2026-10-28,2026-12-31', added?.visited);
+  check('วันที่ที่บันทึกเป็นช่วงที่เลือก', added?.visited === '2026-10-25,2026-10-26,2026-10-27', added?.visited);
   check('หมวด/จังหวัด/คะแนน ถูกบันทึก', added?.category === 'วัด/ศาสนสถาน' && added?.province === 'เชียงใหม่' && added?.rating === 4, JSON.stringify([added?.category, added?.province, added?.rating]));
   check('รูปถูกอัปโหลดและบันทึก URL', added?.photos?.length === 1 && added.photos[0].startsWith('https://lh3'), JSON.stringify(added?.photos));
   check('ฟอร์มปิดหลังบันทึกสำเร็จ', !app.cls('editor').contains('open'));
-  check('ชิปวันที่ในฐานข้อมูลเป็นชนิดข้อความ', typeof ss._sheets.places._grid.find(r => r[1] === 'ดอยสุเทพ')[8] === 'string');
+  check('คอลัมน์วันที่ในชีทเป็นข้อความ', typeof ss._sheets.places._grid.find(r => r[1] === 'ดอยสุเทพ')[8] === 'string');
 
   // --- validation ---
   app.mapH.click({ latlng: { lat: 18.79, lng: 98.98 } });
@@ -444,7 +432,7 @@ async function main() {
   newMarker._fn();
   await flush();
   const dlist = app.html('detail-body');
-  check('หน้ารายละเอียดของที่ใหม่แสดงวันที่ทุกวัน', dlist.includes('ต.ค.') && dlist.includes('ธ.ค.'), dlist.slice(0, 300));
+  check('หน้ารายละเอียดแสดงช่วงวันที่แบบ "25–27 ต.ค. 69 · 3 วัน"', dlist.includes('25–27 ต.ค. 69 · 3 วัน'), dlist.slice(0, 400));
   check('หน้ารายละเอียดของที่ใหม่ไม่มี Invalid', !/Invalid/i.test(dlist));
 
   // รูปเต็มจอ
@@ -457,14 +445,15 @@ async function main() {
   // แก้ไข
   await app.els.detail.dispatch('click', { target: tgt({ act: 'edit' }, '[data-act]') });
   check('ปุ่มแก้ไขเปิดฟอร์มพร้อมข้อมูลเดิม', app.fields.name.value === 'ดอยสุเทพ' && app.cls('editor').contains('open'));
-  check('ฟอร์มแก้ไขแสดงวันที่เดิม', JSON.stringify(get('dates')) === '["2026-10-25","2026-10-27","2026-10-28","2026-12-31"]', JSON.stringify(get('dates')));
+  check('ฟอร์มแก้ไขแสดงวันที่เดิม', JSON.stringify(get('dates')) === '["2026-10-25","2026-10-26","2026-10-27"]', JSON.stringify(get('dates')));
+  check('ฟอร์มแก้ไขใส่วันจากและถึง', app.els['date-from'].value === '2026-10-25' && app.els['date-to'].value === '2026-10-27');
   check('ฟอร์มแก้ไขเก็บรูปเดิม', get('keptPhotos').length === 1);
   app.fields.name.value = 'ดอยสุเทพ (แก้)';
   await app.els.form.dispatch('submit', {});
   await flush();
   const edited = listRaw().places.find(p => p.name === 'ดอยสุเทพ (แก้)');
   check('บันทึกการแก้ไขลง Sheet', !!edited);
-  check('การแก้ไขไม่ทำให้วันที่หาย', edited?.visited === '2026-10-25,2026-10-27,2026-10-28,2026-12-31', edited?.visited);
+  check('การแก้ไขไม่ทำให้วันที่หาย', edited?.visited === '2026-10-25,2026-10-26,2026-10-27', edited?.visited);
   check('การแก้ไขไม่ทำให้รูปหาย', edited?.photos?.length === 1);
 
   // ลบ
@@ -483,6 +472,13 @@ async function main() {
   check('fmtDate แสดงเป็นภาษาไทย', get("fmtDate('2026-10-25')").includes('ต.ค.'), get("fmtDate('2026-10-25')"));
   check('rangeDays ข้ามเดือนและรองรับปีอธิกสุรทิน', JSON.stringify(get("rangeDays('2028-02-28','2028-03-01')")) === '["2028-02-28","2028-02-29","2028-03-01"]');
   check('rangeDays วันเดียว', JSON.stringify(get("rangeDays('2026-10-25','2026-10-25')")) === '["2026-10-25"]');
+
+  check('fmtRange ช่วงในเดือนเดียว', get("fmtRange(['2026-10-09','2026-10-10','2026-10-11','2026-10-12'])") === '9–12 ต.ค. 69');
+  check('fmtRange วันเดียว', get("fmtRange(['2026-10-09'])") === '9 ต.ค. 69');
+  check('fmtRange ข้ามเดือน', get("fmtRange(['2026-10-30','2026-10-31','2026-11-01'])") === '30 ต.ค. – 1 พ.ย. 69', get("fmtRange(['2026-10-30','2026-10-31','2026-11-01'])"));
+  check('fmtRange ข้ามปี (พ.ศ. 2570)', get("fmtRange(['2026-12-31','2027-01-01'])") === '31 ธ.ค. 69 – 1 ม.ค. 70', get("fmtRange(['2026-12-31','2027-01-01'])"));
+  check('fmtRange วันไม่ต่อเนื่องแสดงทีละวัน', get("fmtRange(['2026-10-09','2026-10-11'])") === '9 ต.ค. 69, 11 ต.ค. 69');
+  check('fmtRange ลิสต์ว่างได้ข้อความว่าง', get("fmtRange([])") === '');
 
   console.log(`\nผ่าน ${passed} / ${passed + failed}`);
   if (failed) process.exitCode = 1;
