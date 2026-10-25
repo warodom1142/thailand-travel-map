@@ -78,7 +78,8 @@ function loadCodeGs(ss) {
     .replace(/const PHOTO_FOLDER_ID = '[^']*'/, "const PHOTO_FOLDER_ID = 'FOLDER_TEST'");
   let fileSeq = 0;
   let folderSeq = 0;
-  const drive = { folders: [] };
+  const fileIndex = {};
+  const drive = { folders: [], files: fileIndex };
   const makeFolder = (id, name) => {
     const f = {
       id, name, files: [], trashed: false,
@@ -86,9 +87,12 @@ function loadCodeGs(ss) {
       setName: n => { f.name = n; },
       getId: () => f.id,
       isTrashed: () => f.trashed,
+      setTrashed: v => { f.trashed = v; },
       createFile: blob => {
         const fid = 'FILE' + (++fileSeq);
-        f.files.push({ id: fid, blob });
+        const fo = { id: fid, blob, trashed: false, setTrashed(v) { fo.trashed = v; } };
+        f.files.push(fo);
+        fileIndex[fid] = fo;
         return { getId: () => fid, setSharing() {} };
       },
       createFolder: n => {
@@ -119,6 +123,11 @@ function loadCodeGs(ss) {
     DriveApp: {
       Access: { ANYONE_WITH_LINK: 'anyone' },
       Permission: { VIEW: 'view' },
+      getFileById: id => {
+        const x = fileIndex[id];
+        if (!x) throw new Error('File not found: ' + id);
+        return x;
+      },
       getFolderById: id => {
         if (id === 'FOLDER_TEST') return rootFolder;
         const f = drive.folders.find(x => x.id === id);
@@ -142,6 +151,13 @@ function loadApp(gas) {
   const mapH = {};
   const alerts = [];
   const confirmAnswer = { v: true };
+  const failNext = { v: null }; // ชื่อ action ที่จะให้ล้มเหลวครั้งเดียว
+  const storage = new Map();
+  const fakeStorage = {
+    getItem: k => (storage.has(k) ? storage.get(k) : null),
+    setItem: (k, v) => { storage.set(k, String(v)); },
+    removeItem: k => { storage.delete(k); },
+  };
   const nominatimReply = { v: { address: {} } };
 
   const mkClassList = () => {
@@ -235,6 +251,10 @@ function loadApp(gas) {
   const fetchStub = async (url, opts = {}) => {
     const u = String(url);
     if (u.includes('nominatim')) return { json: async () => nominatimReply.v };
+    if (opts.method === 'POST' && failNext.v && JSON.parse(opts.body).action === failNext.v) {
+      failNext.v = null;
+      throw new Error('เครือข่ายขัดข้อง');
+    }
     const out = opts.method === 'POST'
       ? gas.ctx.doPost({ postData: { contents: opts.body } })
       : gas.ctx.doGet({ parameter: { action: new URL(u).searchParams.get('action') } });
@@ -243,6 +263,7 @@ function loadApp(gas) {
 
   const sandbox = {
     document,
+    localStorage: fakeStorage,
     console,
     Date, Math, Number, String, Promise, JSON, Set, Map, Array, Object, Error, RegExp, Intl,
     setTimeout, clearTimeout,
@@ -275,6 +296,9 @@ function loadApp(gas) {
     alerts,
     confirmAnswer,
     nominatimReply,
+    failNext,
+    fakeStorage,
+    confirmAnswer,
     markers: () => layers[0].markers,
     viewCalls,
     myMarkers: () => layers[1]?.markers || [],
@@ -622,6 +646,66 @@ async function main() {
   check('เปลี่ยนวันที่แล้วโฟลเดอร์เปลี่ยนชื่อตาม "เชียงราย 2026-11-12"', tripFolder.name === 'เชียงราย 2026-11-12', tripFolder.name);
   check('เปลี่ยนชื่อโฟลเดอร์โดยไม่สร้างโฟลเดอร์ใหม่', drv.folders.filter(f => f.id === tripFolder.id).length === 1);
   check('เลื่อน "จาก" ไปหลัง "ถึง" เดิมแล้ว "ถึง" ขยับตามอัตโนมัติ', app.els['date-to'].value === '2026-11-12');
+
+  // --- อัปโหลดค้างแล้วบันทึกต่อ ต้องไม่อัปซ้ำ ---
+  const liveFiles = () => drv.folders.reduce((n, f) => n + f.files.filter(x => !x.trashed).length, 0);
+  const photoFiles = () => [
+    { name: 'p1.jpg', type: 'image/jpeg', size: 11, lastModified: 1 },
+    { name: 'p2.jpg', type: 'image/jpeg', size: 12, lastModified: 2 },
+  ];
+  await app.els['btn-add'].dispatch('click');
+  app.mapH.click({ latlng: { lat: 17.0, lng: 100.0 } });
+  await app.els['f-prov'].dispatch('change');
+  app.fields.name.value = 'ทดสอบค้าง';
+  app.fields.province.value = 'พิษณุโลก';
+  await app.els['f-prov'].dispatch('change');
+  app.els['date-from'].value = '2026-12-01';
+  await app.els['date-from'].dispatch('change');
+  vm.runInContext('newFiles = []', app.sb);
+  await app.els['photo-grid'].dispatch('change', { target: { type: 'file', files: photoFiles(), value: '' } });
+  const liveBefore = liveFiles();
+  app.failNext.v = 'add';
+  await app.els.form.dispatch('submit', {});
+  await flush();
+  const pend1 = JSON.parse(app.fakeStorage.getItem('pendingUpload') || 'null');
+  check('บันทึกไม่สำเร็จ แต่รูปที่อัปโหลดแล้วถูกเก็บไว้', Object.keys(pend1?.uploads || {}).length === 2, JSON.stringify(pend1));
+  check('แจ้งผู้ใช้ว่ารูปถูกเก็บไว้ กดบันทึกซ้ำได้', app.html('form-error').includes('ถูกเก็บไว้'), app.html('form-error'));
+  check('อัปโหลดรูป 2 ไฟล์ตอนแรก', liveFiles() - liveBefore === 2, `${liveBefore} → ${liveFiles()}`);
+
+  vm.runInContext('newFiles = []', app.sb);
+  await app.els['photo-grid'].dispatch('change', { target: { type: 'file', files: photoFiles(), value: '' } });
+  await app.els.form.dispatch('submit', {});
+  await flush();
+  check('บันทึกซ้ำด้วยรูปเดิมไม่อัปโหลดซ้ำ', liveFiles() === liveBefore + 2, `${liveBefore} → ${liveFiles()}`);
+  const resumed = listRaw().places.find(p => p.name === 'ทดสอบค้าง');
+  check('ทริปที่บันทึกต่อมีรูป 2 รูปพอดี', resumed?.photos.length === 2, JSON.stringify(resumed?.photos));
+  check('บันทึกสำเร็จแล้วล้างงานค้าง', app.fakeStorage.getItem('pendingUpload') === null);
+
+  // ปิดฟอร์มหลังอัปโหลดค้าง → รูปและโฟลเดอร์ที่สร้างในรอบนั้นต้องถูกลบ (ย้ายลงถังขยะ)
+  app.els['date-from'].value = '2026-12-05';
+  await app.els['date-from'].dispatch('change');
+  app.mapH.click({ latlng: { lat: 17.2, lng: 100.2 } });
+  await app.els['f-prov'].dispatch('change');
+  app.fields.name.value = 'ทิ้งงาน';
+  app.fields.province.value = 'สุโขทัย';
+  await app.els['f-prov'].dispatch('change');
+  app.els['date-from'].value = '2026-12-06';
+  await app.els['date-from'].dispatch('change');
+  await app.els['btn-add'].dispatch('click');
+  vm.runInContext('newFiles = []', app.sb);
+  await app.els['photo-grid'].dispatch('change', { target: { type: 'file', files: [{ name: 'x1.jpg', type: 'image/jpeg', size: 21, lastModified: 3 }], value: '' } });
+  app.failNext.v = 'add';
+  await app.els.form.dispatch('submit', {});
+  await flush();
+  const pend2 = JSON.parse(app.fakeStorage.getItem('pendingUpload') || 'null');
+  const leftFileId = Object.values(pend2?.uploads || {})[0]?.fileId;
+  check('มีรูปค้างก่อนปิดฟอร์ม', !!leftFileId, JSON.stringify(pend2));
+  app.confirmAnswer.v = true;
+  await app.els['btn-cancel'].dispatch('click');
+  await flush();
+  check('ปิดฟอร์มแล้วรูปค้างถูกย้ายลงถังขยะ', drv.files[leftFileId]?.trashed === true);
+  check('ปิดฟอร์มแล้วล้างงานค้าง', app.fakeStorage.getItem('pendingUpload') === null);
+  check('ทริปที่ไม่ได้บันทึกไม่เข้าชีท', !listRaw().places.some(p => p.name === 'ทิ้งงาน'));
 
   mkTrip._fn();
   await flush();

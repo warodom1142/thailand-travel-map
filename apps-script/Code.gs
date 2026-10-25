@@ -36,6 +36,7 @@ function doPost(e) {
       case 'update': return json({ ok: true, place: updatePlace(body.place) });
       case 'delete': deletePlace(body.id); return json({ ok: true });
       case 'upload': return json({ ok: true, ...uploadFile(body) });
+      case 'discard': discardUploads(body); return json({ ok: true });
       default:       return json({ ok: false, error: 'unknown action' });
     }
   } catch (err) {
@@ -180,7 +181,18 @@ function uploadFile(body) {
   const url = isVideo
     ? 'https://drive.google.com/file/d/' + file.getId() + '/preview'
     : 'https://lh3.googleusercontent.com/d/' + file.getId();
-  return { url: url, folderId: folder.getId() };
+  return { url: url, folderId: folder.getId(), fileId: file.getId() };
+}
+
+// ลบรูปที่อัปโหลดค้างไว้แต่ยังไม่ได้บันทึกทริป (ย้ายลงถังขยะ)
+// body: { fileIds: [...], folderId?, deleteFolder? } — deleteFolder ใช้เมื่อโฟลเดอร์ถูกสร้างในรอบนี้
+function discardUploads(body) {
+  (body.fileIds || []).forEach(id => {
+    try { DriveApp.getFileById(id).setTrashed(true); } catch (err) { /* ไฟล์หายไปแล้ว */ }
+  });
+  if (body.deleteFolder && body.folderId) {
+    try { DriveApp.getFolderById(body.folderId).setTrashed(true); } catch (err) { /* โฟลเดอร์หายไปแล้ว */ }
+  }
 }
 
 // ใช้โฟลเดอร์เดิมถ้ายังอยู่ ไม่งั้นสร้างใหม่ใต้โฟลเดอร์หลัก
