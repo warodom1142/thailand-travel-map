@@ -639,8 +639,3 @@ select.select {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
-
-/* ---------- ค้นหาที่อยู่ ---------- */
-.search-row { display: flex; gap: 8px; }
-.search-row .field { flex: 1; min-width: 0; }
-.search-row .pill { flex: 0 0 auto; }
