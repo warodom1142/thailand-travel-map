@@ -672,7 +672,19 @@ function openEditor(place = null, latlng = null) {
   if (!place && latlng) detectProvince(latlng, true);
 }
 
-$('btn-cancel').addEventListener('click', () => hide('editor'));
+// ปิดฟอร์ม ถ้ามีรูปที่อัปโหลดค้างไว้ของฟอร์มนี้ จะถามก่อนลบ
+async function closeEditor() {
+  const p = loadPending();
+  const editingId = editing?.id || null;
+  if (p && p.editingId === editingId && Object.keys(p.uploads || {}).length) {
+    if (!confirm('มีรูปที่อัปโหลดค้างไว้ ลบรูปเหล่านั้นแล้วปิดฟอร์มใช่หรือไม่?')) return;
+    clearPending();
+    await discardPending(p);
+  }
+  hide('editor');
+}
+
+$('btn-cancel').addEventListener('click', closeEditor);
 
 $('btn-geo').addEventListener('click', () => {
   navigator.geolocation?.getCurrentPosition(
@@ -726,8 +738,45 @@ async function uploadFile(file, folderId, folderName) {
   const ext = isVideoFile(file) ? (file.name?.split('.').pop() || 'mp4') : 'jpg';
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const res = await api('upload', { filename, mimeType, data, folderId, folderName }, true);
-  return { url: res.url, folderId: res.folderId };
+  return { url: res.url, folderId: res.folderId, fileId: res.fileId };
 }
+
+// ---- งานอัปโหลดค้าง: เก็บไว้ในเบราว์เซอร์ เพื่อให้บันทึกต่อได้โดยไม่อัปโหลดซ้ำ ----
+const PENDING_KEY = 'pendingUpload';
+const fileSig = f => `${f.name}|${f.size}|${f.lastModified}`;
+
+function loadPending() {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY)) || null; } catch { return null; }
+}
+function savePending(p) {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(p)); } catch { /* ใช้งานต่อได้แม้เก็บไม่ได้ */ }
+}
+function clearPending() {
+  try { localStorage.removeItem(PENDING_KEY); } catch { /* ไม่เป็นไร */ }
+}
+
+// ลบรูปที่อัปโหลดค้างไว้ (และโฟลเดอร์ถ้าสร้างในรอบนี้) ลงถังขยะ
+async function discardPending(p) {
+  if (!p) return;
+  const fileIds = Object.values(p.uploads || {}).map(u => u.fileId).filter(Boolean);
+  if (!fileIds.length && !p.folderCreated) return;
+  try {
+    await api('discard', { fileIds, folderId: p.folderId || '', deleteFolder: !!p.folderCreated }, true);
+  } catch { /* ถ้าลบไม่สำเร็จ ไฟล์จะยังอยู่ใน Drive ให้ลบเองได้ */ }
+}
+
+// ขอให้จอไม่ดับระหว่างอัปโหลด (iOS 16.4 ขึ้นไป)
+let wakeLock = null;
+async function keepAwake() {
+  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { wakeLock = null; }
+}
+function releaseAwake() {
+  try { wakeLock?.release(); } catch { /* ไม่เป็นไร */ }
+  wakeLock = null;
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && $('btn-save').disabled) keepAwake();
+});
 
 function readAsBase64(file) {
   return new Promise((resolve, reject) => {
@@ -775,18 +824,40 @@ form.addEventListener('submit', async e => {
 
   setSaving(true);
   showBusy('กำลังเตรียมบันทึก…');
+  await keepAwake();
+  let work = null;
   try {
     const photos = [...keptPhotos];
     // โฟลเดอร์ของทริปตั้งชื่อตาม "จังหวัด วันที่แรก" เช่น "เชียงใหม่ 2026-10-25"
-    let folderId = editing?.folder_id || '';
     const folderName = `${f.province.value || 'ไม่ระบุจังหวัด'} ${dates[0] || 'ไม่ระบุวันที่'}`;
+    const editingId = editing?.id || null;
+
+    // ถ้ามีงานค้างของฟอร์มอื่น หรือชื่อโฟลเดอร์เปลี่ยน ให้ลบรูปค้างนั้นทิ้งแล้วเริ่มใหม่
+    work = loadPending();
+    if (work && (work.editingId !== editingId || work.folderName !== folderName)) {
+      await discardPending(work);
+      work = null;
+    }
+    if (!work) work = { editingId, folderName, folderId: editing?.folder_id || '', folderCreated: false, uploads: {} };
+    savePending(work);
+
     for (let i = 0; i < newFiles.length; i++) {
-      showBusy(isVideoFile(newFiles[i]) ? 'กำลังอัปโหลดวิดีโอ' : 'กำลังอัปโหลดรูปภาพ', `${i + 1} จาก ${newFiles.length} ไฟล์`);
-      const up = await uploadFile(newFiles[i], folderId, folderName);
-      folderId = up.folderId;
+      const sig = fileSig(newFiles[i]);
+      let up = work.uploads[sig];
+      if (!up) {
+        showBusy(isVideoFile(newFiles[i]) ? 'กำลังอัปโหลดวิดีโอ' : 'กำลังอัปโหลดรูปภาพ', `${i + 1} จาก ${newFiles.length} ไฟล์`);
+        const wasEmpty = !work.folderId;
+        const res = await uploadFile(newFiles[i], work.folderId, folderName);
+        if (wasEmpty) work.folderCreated = true;
+        work.folderId = res.folderId;
+        up = { url: res.url, fileId: res.fileId };
+        work.uploads[sig] = up;
+        savePending(work);
+      }
       photos.push(up.url);
     }
     showBusy('กำลังบันทึกข้อมูลทริป', 'อย่าเพิ่งปิดหน้านี้');
+    const folderId = work.folderId;
 
     const place = {
       name,
@@ -807,6 +878,7 @@ form.addEventListener('submit', async e => {
     } else {
       await api('add', { place }, true);
     }
+    clearPending();
     showBusy('บันทึกแล้ว ✓');
     await sleep(500);
     hideBusy();
@@ -814,7 +886,10 @@ form.addEventListener('submit', async e => {
     hide('editor');
     await loadPlaces();
   } catch (err) {
-    showFormError(err.message);
+    const kept = work && Object.keys(work.uploads).length;
+    showFormError(kept ? `${err.message} — รูปที่อัปโหลดแล้วถูกเก็บไว้ กดบันทึกอีกครั้งเพื่อทำต่อ` : err.message);
+  } finally {
+    releaseAwake();
   }
 });
 
@@ -822,7 +897,7 @@ form.addEventListener('submit', async e => {
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!lb.hidden) closeLightbox();
-  else if (isOpen('editor')) hide('editor');
+  else if (isOpen('editor')) closeEditor();
   else if (pickMode) setPick(false);
   else if (isOpen('detail')) hide('detail');
 });
