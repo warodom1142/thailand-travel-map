@@ -628,39 +628,6 @@ async function detectProvince(ll, force = false) {
   }
 }
 
-// ค้นหาสถานที่หรือที่อยู่ในไทย แล้วใส่พิกัดและจังหวัดให้
-async function searchAddress() {
-  const q = $('f-search').value.trim();
-  const hint = $('addr-hint');
-  if (!q) {
-    hint.textContent = 'พิมพ์ชื่อหรือที่อยู่ก่อนค้นหา';
-    return;
-  }
-  hint.textContent = 'กำลังค้นหา…';
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycode=th&accept-language=th&limit=1&q=${encodeURIComponent(q)}`;
-    const list = await (await fetch(url)).json();
-    const hit = Array.isArray(list) ? list[0] : null;
-    if (!hit) {
-      hint.textContent = 'ไม่พบสถานที่นี้ ลองพิมพ์ชื่ออื่น หรือปักหมุดบนแผนที่';
-      return;
-    }
-    const ll = { lat: Number(hit.lat), lng: Number(hit.lon) };
-    form.elements.lat.value = ll.lat.toFixed(6);
-    form.elements.lng.value = ll.lng.toFixed(6);
-    if (!form.elements.name.value.trim()) form.elements.name.value = q;
-    hint.textContent = 'พบแล้ว กำลังตรวจจังหวัด…';
-    await detectProvince(ll, true);
-    hint.textContent = 'พบสถานที่แล้ว';
-  } catch {
-    hint.textContent = 'ค้นหาไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่';
-  }
-}
-
-$('btn-addr').addEventListener('click', searchAddress);
-$('f-search').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); searchAddress(); }
-});
 $('btn-prov-change').addEventListener('click', () => {
   showPicker(true);
 });
@@ -682,8 +649,6 @@ function openEditor(place = null, latlng = null) {
   f.lng.value = place ? place.lng : latlng ? latlng.lng.toFixed(6) : '';
   f.province.value = place?.province || '';
   $('prov-hint').textContent = '';
-  $('f-search').value = '';
-  $('addr-hint').textContent = 'พิมพ์ชื่อหรือที่อยู่ แล้วกดค้นหา ระบบจะหาพิกัดและจังหวัดให้';
   provSeq++;
   renderProvince();
   showPicker(!f.province.value);
