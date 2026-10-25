@@ -61,8 +61,23 @@
         </div>
 
         <div class="section">
-          <span class="label">หมวดหมู่</span>
-          <div id="form-cats" class="cat-grid"></div>
+          <span class="label">วันที่ไป</span>
+          <div class="date-row">
+            <label class="date-field">
+              <small>จาก</small>
+              <input id="date-from" type="date" class="field">
+            </label>
+            <label class="date-field">
+              <small>ถึง</small>
+              <input id="date-to" type="date" class="field">
+            </label>
+          </div>
+          <p id="date-error" class="field-error"></p>
+          <div class="date-summary">
+            <span id="date-summary">ยังไม่ได้เลือกวัน</span>
+            <button type="button" id="btn-clear-date" class="link">ล้าง</button>
+          </div>
+          <small class="hint">ถ้าไปวันเดียวใส่แค่ "จาก" ได้เลย</small>
         </div>
 
         <div class="section">
@@ -86,23 +101,8 @@
         </div>
 
         <div class="section">
-          <span class="label">วันที่ไป</span>
-          <div class="date-row">
-            <label class="date-field">
-              <small>จาก</small>
-              <input id="date-from" type="date" class="field">
-            </label>
-            <label class="date-field">
-              <small>ถึง</small>
-              <input id="date-to" type="date" class="field">
-            </label>
-          </div>
-          <p id="date-error" class="field-error"></p>
-          <div class="date-summary">
-            <span id="date-summary">ยังไม่ได้เลือกวัน</span>
-            <button type="button" id="btn-clear-date" class="link">ล้าง</button>
-          </div>
-          <small class="hint">ถ้าไปวันเดียวใส่แค่ "จาก" ได้เลย</small>
+          <span class="label">หมวดหมู่</span>
+          <div id="form-cats" class="cat-grid"></div>
         </div>
 
         <div class="section">
