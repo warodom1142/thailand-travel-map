@@ -4,8 +4,8 @@
  *
  * ต้องแก้ 2 ค่าด้านล่างก่อน deploy
  */
-const PHOTO_FOLDER_ID = 'PUT_DRIVE_FOLDER_ID_HERE'; // ID ของโฟลเดอร์ใน Google Drive ที่จะเก็บรูป
-const SECRET = 'change-me';                          // ต้องตรงกับ config.js
+const PHOTO_FOLDER_ID = '18hPgUTsr999zbvjAsObJh9OO1-jnYUxD'; // ID ของโฟลเดอร์ใน Google Drive ที่จะเก็บรูป
+const SECRET = '1142';                          // ต้องตรงกับ config.js
 
 const SHEET_NAME = 'places';
 const HEADERS = [
