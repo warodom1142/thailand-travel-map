@@ -72,6 +72,47 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 if (matchMedia('(min-width: 720px)').matches) L.control.zoom({ position: 'bottomleft' }).addTo(map);
 const markerLayer = L.layerGroup().addTo(map);
+const myLayer = L.layerGroup().addTo(map);
+
+// ---------- ตำแหน่งของฉัน ----------
+// หาตำแหน่งจาก GPS แล้วเลื่อนแผนที่ไปที่นั่น พร้อมวาดจุดและวงความแม่นยำ
+function locateMe(onFound) {
+  if (!navigator.geolocation) {
+    setStatus('เบราว์เซอร์นี้ไม่รองรับการหาตำแหน่ง', true);
+    return;
+  }
+  setStatus('กำลังหาตำแหน่งของคุณ…');
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      const acc = Math.round(pos.coords.accuracy || 0);
+      myLayer.clearLayers();
+      L.circle([ll.lat, ll.lng], { radius: acc, color: '#2563eb', weight: 1, fillColor: '#2563eb', fillOpacity: 0.12 }).addTo(myLayer);
+      L.marker([ll.lat, ll.lng], {
+        icon: L.divIcon({ className: 'me-wrap', html: '<div class="me-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
+        interactive: false,
+      }).addTo(myLayer);
+      map.setView([ll.lat, ll.lng], Math.max(map.getZoom(), 15));
+      setStatus(`คุณอยู่ที่นี่ · ความแม่นยำประมาณ ${acc} ม.`);
+      if (onFound) onFound(ll);
+    },
+    err => {
+      const msg = err.code === 1
+        ? 'ไม่ได้รับอนุญาตให้ใช้ตำแหน่ง (เปิดในการตั้งค่าของเบราว์เซอร์)'
+        : 'หาตำแหน่งไม่ได้ ลองอีกครั้งในที่ที่สัญญาณดีกว่า';
+      setStatus(msg, true);
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+  );
+}
+
+$('btn-locate').addEventListener('click', () => locateMe());
+$('btn-pick-here').addEventListener('click', () => {
+  locateMe(ll => {
+    setPick(false);
+    openEditor(null, { lat: ll.lat, lng: ll.lng });
+  });
+});
 
 // ---------- sheets / lightbox ----------
 function show(id) {

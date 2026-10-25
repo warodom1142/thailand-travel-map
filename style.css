@@ -564,3 +564,36 @@ body.sheet-open .fab { opacity: 0; pointer-events: none; transform: scale(0.8); 
   border: 0;
   background: #000;
 }
+
+/* ---------- ตำแหน่งของฉัน ---------- */
+.locate {
+  position: fixed;
+  right: 18px;
+  bottom: calc(env(safe-area-inset-bottom) + 98px);
+  z-index: 850;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 22px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.18);
+}
+.me-wrap { background: none; border: none; }
+.me-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6);
+  animation: me-pulse 2s infinite;
+}
+@keyframes me-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.55); }
+  70% { box-shadow: 0 0 0 14px rgba(37, 99, 235, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+.pick-banner button#btn-pick-here { background: #2563eb; color: #fff; }
+@media (min-width: 720px) {
+  .locate { right: 24px; bottom: 100px; }
+}

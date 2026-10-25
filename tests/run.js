@@ -206,9 +206,10 @@ function loadApp(gas) {
   }
 
   const layers = [];
+  const viewCalls = [];
   const L = {
     map: () => {
-      const m = { setView() { return m; }, on(t, fn) { mapH[t] = fn; }, panTo() {}, fitBounds() {} };
+      const m = { setView(ll, z) { viewCalls.push({ ll, z }); return m; }, getZoom: () => 6, on(t, fn) { mapH[t] = fn; }, panTo() {}, fitBounds() {} };
       return m;
     },
     tileLayer: () => ({ addTo() { return this; } }),
@@ -219,9 +220,10 @@ function loadApp(gas) {
       return g;
     },
     divIcon: o => o,
-    marker: (ll) => {
+    circle: (ll, opts) => ({ ll, opts, addTo(layer) { layer.markers.push(this); return this; } }),
+    marker: (ll, opts) => {
       const m = {
-        ll, _fn: null,
+        ll, opts, _fn: null,
         on(t, fn) { this._fn = fn; return this; },
         bindTooltip() { return this; },
         addTo(layer) { layer.markers.push(this); return this; },
@@ -274,6 +276,8 @@ function loadApp(gas) {
     confirmAnswer,
     nominatimReply,
     markers: () => layers[0].markers,
+    viewCalls,
+    myMarkers: () => layers[1]?.markers || [],
     get: name => vm.runInContext(name, sandbox),
     // ข้อความที่แอพเขียนด้วย textContent (สถานะ, ข้อผิดพลาด) หรือ innerHTML
     html: id => els[id]?.innerHTML || els[id]?.textContent || '',
@@ -636,6 +640,35 @@ async function main() {
   const gas2 = loadCodeGs(ss2);
   gas2.ctx.doGet({ parameter: { action: 'list' } });
   check('ชีทเก่าได้หัวคอลัมน์ folder_id เพิ่มอัตโนมัติ', ss2._sheets.places._grid[0][12] === 'folder_id');
+
+  // ================= 5. ตำแหน่งของฉัน =================
+  console.log('\n== 5. ตำแหน่งของฉัน ==');
+  app.sb.navigator.geolocation = {
+    getCurrentPosition: (ok) => ok({ coords: { latitude: 18.7883, longitude: 98.9853, accuracy: 12 } }),
+  };
+  app.els['btn-locate'].dispatch('click');
+  check('ปุ่มหาตำแหน่งเลื่อนแผนที่ไปที่ตำแหน่งจริง', app.viewCalls.at(-1)?.ll[0] === 18.7883);
+  check('แสดงข้อความความแม่นยำ', app.html('status').includes('คุณอยู่ที่นี่') && app.html('status').includes('12 ม.'), app.html('status'));
+  check('วาดจุดของฉันบนแผนที่', app.myMarkers().length >= 1);
+
+  app.sb.navigator.geolocation = {
+    getCurrentPosition: (_ok, err) => err({ code: 1 }),
+  };
+  app.els['btn-locate'].dispatch('click');
+  check('ไม่ได้รับอนุญาตแจ้งข้อความชัดเจน', app.html('status').includes('ไม่ได้รับอนุญาต'), app.html('status'));
+
+  app.sb.navigator.geolocation = {
+    getCurrentPosition: (ok) => ok({ coords: { latitude: 13.7563, longitude: 100.5018, accuracy: 30 } }),
+  };
+  await app.els['btn-add'].dispatch('click');
+  await app.els['btn-pick-here'].dispatch('click');
+  await flush();
+  check('ใช้ตำแหน่งฉันตอนปักหมุดเปิดฟอร์มพร้อมพิกัด', app.cls('editor').contains('open') && app.fields.lat.value === '13.756300', app.fields.lat.value);
+  check('ออกจากโหมดปักหมุดหลังใช้ตำแหน่งฉัน', !app.cls('body').contains('picking'));
+
+  app.sb.navigator.geolocation = undefined;
+  app.els['btn-locate'].dispatch('click');
+  check('เบราว์เซอร์ไม่รองรับ GPS แจ้งเตือน', app.html('status').includes('ไม่รองรับ'), app.html('status'));
 
   console.log(`\nผ่าน ${passed} / ${passed + failed}`);
   if (failed) process.exitCode = 1;
