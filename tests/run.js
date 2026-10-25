@@ -82,6 +82,8 @@ function loadCodeGs(ss) {
   const makeFolder = (id, name) => {
     const f = {
       id, name, files: [], trashed: false,
+      getName: () => f.name,
+      setName: n => { f.name = n; },
       getId: () => f.id,
       isTrashed: () => f.trashed,
       createFile: blob => {
@@ -586,10 +588,30 @@ async function main() {
   check('แก้ไขแล้วเพิ่มรูปใช้โฟลเดอร์เดิม ไม่สร้างซ้ำ', drv.folders.length === foldersBefore, `${foldersBefore} → ${drv.folders.length}`);
   check('รูปใหม่ตามเข้าโฟลเดอร์เดิม', tripFolder.files.length === 3, String(tripFolder.files.length));
 
+  // วิดีโอเกินขนาดที่กำหนด (50 MB) ต้องถูกปฏิเสธพร้อมข้อความชัดเจน
+  mkTrip._fn();
+  await app.els.detail.dispatch('click', { target: tgt({ act: 'edit' }, '[data-act]') });
+  vm.runInContext('newFiles = []', app.sb);
+  await app.els['photo-grid'].dispatch('change', { target: { type: 'file', files: [{ name: 'big.mp4', type: 'video/mp4', size: 51 * 1024 * 1024 }], value: '' } });
+  await app.els.form.dispatch('submit', {});
+  check('วิดีโอเกิน 50 MB ถูกปฏิเสธพร้อมข้อความ', app.html('form-error').includes('ใหญ่เกิน 50 MB'), app.html('form-error'));
+
+  // วิดีโอ 49 MB ผ่าน + เปลี่ยนวันที่ → โฟลเดอร์ต้องเปลี่ยนชื่อตาม
+  vm.runInContext('newFiles = []', app.sb);
+  await app.els['photo-grid'].dispatch('change', { target: { type: 'file', files: [{ name: 'ok.mp4', type: 'video/mp4', size: 49 * 1024 * 1024 }], value: '' } });
+  app.els['date-from'].value = '2026-11-12';
+  await app.els['date-from'].dispatch('change');
+  await app.els.form.dispatch('submit', {});
+  await flush();
+  check('วิดีโอ 49 MB อัปโหลดได้', listRaw().places.find(p => p.name === 'วัดร่องขุ่น')?.photos.some(u => u.endsWith('/preview')));
+  check('เปลี่ยนวันที่แล้วโฟลเดอร์เปลี่ยนชื่อตาม "เชียงราย 2026-11-12"', tripFolder.name === 'เชียงราย 2026-11-12', tripFolder.name);
+  check('เปลี่ยนชื่อโฟลเดอร์โดยไม่สร้างโฟลเดอร์ใหม่', drv.folders.filter(f => f.id === tripFolder.id).length === 1);
+  check('เลื่อน "จาก" ไปหลัง "ถึง" เดิมแล้ว "ถึง" ขยับตามอัตโนมัติ', app.els['date-to'].value === '2026-11-12');
+
   mkTrip._fn();
   await flush();
   check('รายละเอียดแสดงวิดีโอเป็นช่อง ▶', app.html('detail-body').includes('video-cell'));
-  check('รายละเอียดนับรูปรวมวิดีโอ "📷 3 รูป"', app.html('detail-body').includes('📷 3 รูป'));
+  check('รายละเอียดนับรูปรวมวิดีโอ "📷 4 รูป"', app.html('detail-body').includes('📷 4 รูป'), app.html('detail-body').match(/📷 \d+ รูป/)?.[0]);
   get("openLightbox(['https://drive.google.com/file/d/X/preview'], 0)");
   check('เปิดวิดีโอเต็มจอด้วย iframe', app.els['lb-track'].innerHTML.includes('<iframe'));
   app.els['lb-close'].dispatch('click');

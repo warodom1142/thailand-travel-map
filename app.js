@@ -44,7 +44,7 @@ const splitDates = v => [...new Set(String(v ?? '').split(',').map(toIso).filter
 // วิดีโอเก็บเป็นลิงก์ preview ของ Google Drive (…/preview)
 const isDriveVideo = url => String(url || '').includes('drive.google.com/file/d/');
 const isVideoFile = f => String(f.type || '').startsWith('video/');
-const MAX_VIDEO_MB = 40;
+const MAX_VIDEO_MB = 50;
 
 const tile = (url, kind, i, idx) =>
   `<div class="tile"><img src="${esc(url)}" data-i="${idx}" alt="">` +
@@ -476,9 +476,13 @@ function syncDateInputs() {
 }
 
 // อ่านช่องจาก–ถึง แล้วสร้างรายการวัน (ถ้าไม่กรอกถึง = วันเดียว)
-function onDateChange() {
+function onDateChange(source) {
   dateTouched = true;
   const from = $('date-from').value;
+  // เปลี่ยน "จาก" ให้ไปอยู่หลัง "ถึง" เดิม → ขยับ "ถึง" ตามอัตโนมัติ
+  if (source === 'from' && from && $('date-to').value && $('date-to').value < from) {
+    $('date-to').value = from;
+  }
   const to = $('date-to').value || from;
   if (from && to < from) {
     dateError = 'ถึงวันที่ต้องไม่ก่อนวันที่ไป';
@@ -491,8 +495,8 @@ function onDateChange() {
   renderDates();
 }
 
-$('date-from').addEventListener('change', onDateChange);
-$('date-to').addEventListener('change', onDateChange);
+$('date-from').addEventListener('change', () => onDateChange('from'));
+$('date-to').addEventListener('change', () => onDateChange('to'));
 $('btn-clear-date').addEventListener('click', () => {
   dates = [];
   dateTouched = false;
@@ -711,6 +715,7 @@ form.addEventListener('submit', async e => {
       rating,
       visited: dates.join(','),
       folder_id: folderId,
+      folder_name: folderName,
       description: f.description.value.trim(),
       photos,
     };

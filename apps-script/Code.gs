@@ -149,6 +149,8 @@ function updatePlace(p) {
   if (idx < 0) throw new Error('ไม่พบสถานที่นี้');
   const created = sh.getRange(idx, HEADERS.indexOf('created_at') + 1).getValue();
   writeRow(sh, idx, rowFor(p, created, new Date().toISOString()));
+  // ถ้าจังหวัดหรือวันที่เปลี่ยน ให้เปลี่ยนชื่อโฟลเดอร์ของทริปตามไปด้วย
+  if (p.folder_id && p.folder_name) renameTripFolder(p.folder_id, p.folder_name);
   return { id: p.id };
 }
 
@@ -192,8 +194,21 @@ function getTripFolder(folderId, folderName) {
     }
   }
   const root = DriveApp.getFolderById(PHOTO_FOLDER_ID);
-  const name = String(folderName || 'ทริปใหม่').replace(/[\\/]/g, '-').slice(0, 120);
-  return root.createFolder(name);
+  return root.createFolder(safeFolderName(folderName));
+}
+
+function safeFolderName(name) {
+  return String(name || 'ทริปใหม่').replace(/[\\/]/g, '-').slice(0, 120);
+}
+
+function renameTripFolder(folderId, folderName) {
+  try {
+    const folder = DriveApp.getFolderById(folderId);
+    const name = safeFolderName(folderName);
+    if (!folder.isTrashed() && folder.getName() !== name) folder.setName(name);
+  } catch (err) {
+    // โฟลเดอร์หายไปแล้ว ไม่ต้องทำอะไร
+  }
 }
 
 // ---------- util ----------
