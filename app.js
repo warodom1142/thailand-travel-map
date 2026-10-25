@@ -53,10 +53,9 @@ const form = $('form');
 
 // ---------- map ----------
 const map = L.map('map', { zoomControl: false }).setView(cfg.MAP_CENTER, cfg.MAP_ZOOM);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  subdomains: 'abcd',
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
-  attribution: '&copy; OpenStreetMap &copy; CARTO',
+  attribution: '&copy; OpenStreetMap contributors',
 }).addTo(map);
 if (matchMedia('(min-width: 720px)').matches) L.control.zoom({ position: 'bottomleft' }).addTo(map);
 const markerLayer = L.layerGroup().addTo(map);
