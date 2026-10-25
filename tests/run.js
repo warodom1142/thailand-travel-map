@@ -377,13 +377,13 @@ async function main() {
   // ถึงก่อนจากต้องถูกปฏิเสธและไม่เปลี่ยนค่าเดิม
   app.els['date-to'].value = '2026-10-24';
   await app.els['date-to'].dispatch('change');
-  check('ถึงวันที่ก่อนวันที่จากถูกปฏิเสธ', app.html('form-error').includes('ต้องไม่ก่อน'), app.html('form-error'));
+  check('ถึงวันที่ก่อนวันที่จากถูกปฏิเสธ', app.html('date-error').includes('ต้องไม่ก่อน'), app.html('date-error'));
   check('ค่าวันที่เดิมไม่เปลี่ยนเมื่อผิดพลาด', get('dates').length === 4);
 
   // แก้เป็นถึงวันที่ 27 = 3 วัน
   app.els['date-to'].value = '2026-10-27';
   await app.els['date-to'].dispatch('change');
-  check('แก้เป็นถึงวันที่ 27 = 3 วัน และล้างข้อความผิดพลาด', get('dates').length === 3 && app.html('form-error') === '');
+  check('แก้เป็นถึงวันที่ 27 = 3 วัน และล้างข้อความผิดพลาด', get('dates').length === 3 && app.html('date-error') === '');
   check('สรุปหลังแก้ถูกต้อง', app.html('date-summary') === '25–27 ต.ค. 69', app.html('date-summary'));
 
   // ปุ่มล้างวัน

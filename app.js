@@ -358,11 +358,11 @@ function onDateChange() {
   const to = $('date-to').value || from;
   if (from && to < from) {
     dateError = 'ถึงวันที่ต้องไม่ก่อนวันที่ไป';
-    $('form-error').textContent = dateError;
+    $('date-error').textContent = dateError;
     return;
   }
   dateError = '';
-  $('form-error').textContent = '';
+  $('date-error').textContent = '';
   dates = from ? rangeDays(from, to) : [];
   renderDates();
 }
@@ -373,7 +373,7 @@ $('btn-clear-date').addEventListener('click', () => {
   dates = [];
   dateTouched = false;
   dateError = '';
-  $('form-error').textContent = '';
+  $('date-error').textContent = '';
   syncDateInputs();
   renderDates();
 });
@@ -519,7 +519,10 @@ form.addEventListener('submit', async e => {
     return showFormError('ยังไม่มีพิกัด — แตะบนแผนที่เพื่อปักหมุด หรือเปิดหัวข้อพิกัดแล้วกรอกเอง');
   }
 
-  if (dateError) return showFormError(dateError);
+  if (dateError) {
+    $('date-error').textContent = dateError;
+    return showFormError('กรุณาแก้วันที่ให้ถูกต้องก่อนบันทึก');
+  }
 
   setSaving(true);
   try {
