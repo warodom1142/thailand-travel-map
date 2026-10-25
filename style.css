@@ -320,8 +320,18 @@ body.sheet-open .fab { opacity: 0; pointer-events: none; transform: scale(0.8); 
   font-size: 14px;
   font-weight: 600;
 }
-.date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.date-row .pill { grid-column: 1 / -1; padding: 12px; }
+.date-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
+.date-row .pill { padding: 0 16px; white-space: nowrap; }
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.check input { width: 20px; height: 20px; accent-color: var(--accent); }
+.stay-box { margin-top: 10px; }
 .date-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .date-chip {
   display: inline-flex;

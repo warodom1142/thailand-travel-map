@@ -14,7 +14,7 @@ const PROVINCES = [
   'กรุงเทพมหานคร', 'กระบี่', 'กาญจนบุรี', 'กาฬสินธุ์', 'กำแพงเพชร', 'ขอนแก่น', 'จันทบุรี',
   'ฉะเชิงเทรา', 'ชลบุรี', 'ชัยนาท', 'ชัยภูมิ', 'ชุมพร', 'เชียงราย', 'เชียงใหม่', 'ตรัง',
   'ตราด', 'ตาก', 'นครนายก', 'นครปฐม', 'นครพนม', 'นครราชสีมา', 'นครศรีธรรมราช', 'นครสวรรค์',
-  'นนทบุรี', 'นราธิวาส', 'น่าน', 'บุรีรัมย์', 'ปทุมธานี', 'ประจวบคีรีขันธ์', 'ปราจีนบุรี',
+  'นนทบุรี', 'นราธิวาส', 'น่าน', 'บึงกาฬ', 'บุรีรัมย์', 'ปทุมธานี', 'ประจวบคีรีขันธ์', 'ปราจีนบุรี',
   'ปัตตานี', 'พระนครศรีอยุธยา', 'พะเยา', 'พังงา', 'พัทลุง', 'พิจิตร', 'พิษณุโลก', 'เพชรบุรี',
   'เพชรบูรณ์', 'แพร่', 'ภูเก็ต', 'มหาสารคาม', 'มุกดาหาร', 'แม่ฮ่องสอน', 'ยะลา', 'ยโสธร',
   'ร้อยเอ็ด', 'ระนอง', 'ระยอง', 'ราชบุรี', 'ลพบุรี', 'ลำปาง', 'ลำพูน', 'เลย', 'ศรีสะเกษ',
@@ -32,7 +32,15 @@ const pad = n => String(n).padStart(2, '0');
 const isoOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const fmtDate = iso => new Date(iso + 'T00:00:00')
   .toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
-const splitDates = v => String(v || '').split(',').map(s => s.trim()).filter(Boolean).sort();
+// แปลงค่าวันที่จากชีทให้เป็น yyyy-mm-dd; ค่าที่อ่านไม่ออกจะถูกทิ้ง ไม่แสดง Invalid Date
+function toIso(v) {
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? '' : isoOf(d);
+}
+const splitDates = v => [...new Set(String(v ?? '').split(',').map(toIso).filter(Boolean))].sort();
 const tile = (url, kind, i, idx) =>
   `<div class="tile"><img src="${esc(url)}" data-i="${idx}" alt="">` +
   `<button type="button" class="tile-x" data-kind="${kind}" data-i="${i}" aria-label="ลบรูป">✕</button></div>`;
@@ -316,16 +324,57 @@ function renderDates() {
     : '<span class="hint">ยังไม่ได้เลือกวัน</span>';
 }
 
-$('btn-add-date').addEventListener('click', () => {
-  const from = $('date-from').value;
-  const to = $('date-to').value;
-  if (!from) return;
-  const add = to && to >= from ? rangeDays(from, to) : [from];
-  if (add.length > 60) return alert('เพิ่มได้ไม่เกิน 60 วันต่อครั้ง');
-  dates = [...new Set([...dates, ...add])].sort();
+// ---------- วันที่ไป ----------
+function clearDateInputs() {
   $('date-from').value = '';
   $('date-to').value = '';
+  $('stay-toggle').checked = false;
+  $('stay-box').hidden = true;
+}
+
+// แปลงค่าในช่องกรอกเป็นรายการวัน (วันเดียว หรือทั้งช่วงถ้าติ๊กค้างคืน)
+function pendingDates() {
+  const from = $('date-from').value;
+  if (!from) return [];
+  const stay = $('stay-toggle').checked;
+  const to = stay ? $('date-to').value : '';
+  if (stay && !to) throw new Error('เลือก "ถึงวันที่" ด้วย หรือปิดตัวเลือกค้างคืน');
+  if (to && to < from) throw new Error('"ถึงวันที่" ต้องไม่ก่อนวันที่ไป');
+  return to ? rangeDays(from, to) : [from];
+}
+
+function addPendingDates() {
+  const add = pendingDates();
+  if (!add.length) return;
+  dates = [...new Set([...dates, ...add])].sort();
+  clearDateInputs();
   renderDates();
+}
+
+function tryAddDates() {
+  try {
+    addPendingDates();
+    $('form-error').textContent = '';
+  } catch (err) {
+    $('form-error').textContent = err.message;
+  }
+}
+
+// เลือกวันเดียวแล้วเพิ่มเลย ไม่ต้องกดปุ่ม
+$('date-from').addEventListener('change', () => {
+  if (!$('stay-toggle').checked) tryAddDates();
+});
+$('date-to').addEventListener('change', tryAddDates);
+$('stay-toggle').addEventListener('change', e => {
+  $('stay-box').hidden = !e.target.checked;
+  if (!e.target.checked) $('date-to').value = '';
+});
+$('btn-add-date').addEventListener('click', () => {
+  if (!$('date-from').value) {
+    $('form-error').textContent = 'เลือกวันที่ก่อน';
+    return;
+  }
+  tryAddDates();
 });
 
 $('date-chips').addEventListener('click', e => {
@@ -399,9 +448,8 @@ function openEditor(place = null, latlng = null) {
   renderStars();
 
   dates = splitDates(place?.visited);
+  clearDateInputs();
   renderDates();
-  $('date-from').value = '';
-  $('date-to').value = '';
 
   keptPhotos = place ? [...place.photos] : [];
   newFiles = [];
@@ -473,6 +521,13 @@ form.addEventListener('submit', async e => {
   if (!name) return showFormError('กรุณาใส่ชื่อสถานที่');
   if (Number.isNaN(lat) || Number.isNaN(lng)) {
     return showFormError('ยังไม่มีพิกัด — แตะบนแผนที่เพื่อปักหมุด หรือเปิดหัวข้อพิกัดแล้วกรอกเอง');
+  }
+
+  // วันที่ที่ยังค้างในช่องกรอกจะถูกเพิ่มให้อัตโนมัติก่อนบันทึก
+  try {
+    dates = [...new Set([...dates, ...pendingDates()])].sort();
+  } catch (err) {
+    return showFormError(err.message);
   }
 
   setSaving(true);

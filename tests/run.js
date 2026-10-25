@@ -1,0 +1,494 @@
+// ทดสอบจำลองโดยไม่ใช้เบราว์เซอร์ (รันด้วย: node tests/run.js)
+// - Code.gs ทำงานจริงบน Google Sheet จำลอง (ชีทจะแปลง "2026-10-25" เป็นวันที่เอง เหมือนของจริง)
+// - app.js ทำงานจริงบน DOM จำลอง โดย fetch จะส่งไปหา Code.gs จริง
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const ROOT = path.join(__dirname, '..');
+const read = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
+
+let passed = 0;
+let failed = 0;
+function check(name, cond, info = '') {
+  if (cond) {
+    passed++;
+    console.log('  ✓', name);
+  } else {
+    failed++;
+    console.log('  ✗', name, info ? `— ${info}` : '');
+  }
+}
+const sleep = (ms = 0) => new Promise(r => setTimeout(r, ms));
+const flush = async () => { for (let i = 0; i < 6; i++) await sleep(0); };
+
+// ---------- Google Sheet จำลอง ----------
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function makeSpreadsheet(tz = 'Asia/Bangkok') {
+  const sheets = {};
+  function makeSheet(name) {
+    const grid = [];
+    const fmt = {};
+    // จำลองการแปลงค่าของ Google Sheet: ถ้าไม่ได้ตั้งเป็นข้อความ จะแปลงรูปแบบวันที่เป็นวันที่
+    const coerce = (v, r, c) => {
+      if (fmt[`${r},${c}`] === '@') return v == null ? '' : String(v);
+      if (typeof v === 'string' && DATE_RE.test(v)) {
+        const [y, m, d] = v.split('-').map(Number);
+        return new Date(y, m - 1, d);
+      }
+      return v;
+    };
+    const cellRange = (r, c, nr, nc) => ({
+      getValues: () => Array.from({ length: nr }, (_, i) =>
+        Array.from({ length: nc }, (_, j) => ((grid[r - 1 + i] || [])[c - 1 + j] ?? ''))),
+      getValue: () => ((grid[r - 1] || [])[c - 1] ?? ''),
+      setValues: vals => vals.forEach((row, i) => {
+        const ri = r + i - 1;
+        grid[ri] = grid[ri] || [];
+        row.forEach((v, j) => { grid[ri][c - 1 + j] = coerce(v, r + i, c + j); });
+      }),
+      setNumberFormat: f => {
+        for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) fmt[`${r + i},${c + j}`] = f;
+      },
+    });
+    return {
+      name,
+      _grid: grid,
+      getLastRow: () => grid.length,
+      getDataRange: () => ({ getValues: () => (grid.length ? grid.map(r => [...r]) : [['']]) }),
+      getRange: (r, c, nr = 1, nc = 1) => cellRange(r, c, nr, nc),
+      appendRow: row => cellRange(grid.length + 1, 1, 1, row.length).setValues([row]),
+      deleteRow: r => grid.splice(r - 1, 1),
+      setFrozenRows() {},
+    };
+  }
+  return {
+    _sheets: sheets,
+    getSheetByName: n => sheets[n] || null,
+    insertSheet: n => (sheets[n] = makeSheet(n)),
+    getSpreadsheetTimeZone: () => tz,
+  };
+}
+
+// ---------- โหลด Code.gs (ใช้ SECRET เดียวกับ config.js) ----------
+function loadCodeGs(ss) {
+  const src = read('apps-script/Code.gs')
+    .replace("const SECRET = 'change-me';", "const SECRET = '1142';")
+    .replace("'PUT_DRIVE_FOLDER_ID_HERE'", "'FOLDER_TEST'");
+  const uploads = [];
+  const ctx = {
+    SpreadsheetApp: { getActiveSpreadsheet: () => ss },
+    ContentService: {
+      createTextOutput: s => ({ s, setMimeType() { return this; } }),
+      MimeType: { JSON: 'json' },
+    },
+    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    Utilities: {
+      getUuid: () => crypto.randomUUID(),
+      base64Decode: s => Buffer.from(s, 'base64'),
+      newBlob: (bytes, mime, name) => ({ bytes, mime, name }),
+      formatDate: d => {
+        const p = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      },
+    },
+    DriveApp: {
+      Access: { ANYONE_WITH_LINK: 'anyone' },
+      Permission: { VIEW: 'view' },
+      getFolderById: () => ({
+        createFile: blob => {
+          uploads.push(blob);
+          return { getId: () => 'FILE' + uploads.length, setSharing() {} };
+        },
+      }),
+    },
+    Date, JSON, Math, Number, String, Array, Object, Error, RegExp, Buffer, crypto,
+  };
+  vm.createContext(ctx);
+  vm.runInContext(src, ctx);
+  return { ctx, uploads };
+}
+
+// ---------- DOM จำลองสำหรับ app.js ----------
+function loadApp(gas) {
+  const store = {};
+  // ทุกครั้งที่อ้างถึง id จะได้ element เสมอ (เหมือน $('id') ในหน้าจริง)
+  const els = new Proxy(store, { get: (t, id) => (t[id] ||= mk(String(id))) });
+  const docL = {};
+  const mapH = {};
+  const alerts = [];
+  const confirmAnswer = { v: true };
+  const nominatimReply = { v: { address: {} } };
+
+  const mkClassList = () => {
+    const s = new Set();
+    return {
+      add: (...c) => c.forEach(x => s.add(x)),
+      remove: (...c) => c.forEach(x => s.delete(x)),
+      toggle: (c, f) => { const on = f ?? !s.has(c); on ? s.add(c) : s.delete(c); return on; },
+      contains: c => s.has(c),
+    };
+  };
+  const mk = id => ({
+    id,
+    value: '',
+    checked: false,
+    hidden: false,
+    disabled: false,
+    innerHTML: '',
+    textContent: '',
+    type: '',
+    dataset: {},
+    scrollLeft: 0,
+    clientWidth: 400,
+    offsetWidth: 1,
+    children: [],
+    style: {},
+    classList: mkClassList(),
+    _l: {},
+    addEventListener(t, fn) { (this._l[t] ||= []).push(fn); },
+    dispatch(t, ev = {}) {
+      const e = { target: this, preventDefault() {}, ...ev };
+      return Promise.all((this._l[t] || []).map(fn => fn(e)));
+    },
+    insertAdjacentHTML(pos, html) { this.innerHTML += html; },
+    closest() { return null; },
+  });
+
+  els.form = mk('form');
+  // สถานะเริ่มต้นตาม index.html (มี attribute hidden)
+  for (const id of ['detail', 'editor', 'lightbox', 'pick-banner', 'stay-box']) els[id].hidden = true;
+  const fields = {};
+  els.form.elements = new Proxy({}, { get: (_, name) => (fields[name] ||= mk(String(name))) });
+
+  const document = {
+    getElementById: id => (els[id] ||= mk(id)),
+    addEventListener(t, fn) { (docL[t] ||= []).push(fn); },
+    querySelector: sel => (sel === '.sheet.open'
+      ? ['detail', 'editor'].map(i => els[i]).find(e => e && e.classList.contains('open')) || null
+      : null),
+    get body() { return els.body; },
+    createElement: tag => (tag === 'canvas'
+      ? { width: 0, height: 0, getContext: () => ({ drawImage() {} }), toDataURL: () => 'data:image/jpeg;base64,QUJD' }
+      : {}),
+  };
+
+  class FakeImage {
+    set src(v) {
+      this._src = v;
+      setTimeout(() => { this.width = 800; this.height = 600; this.onload && this.onload(); }, 0);
+    }
+    get src() { return this._src; }
+  }
+
+  const layers = [];
+  const L = {
+    map: () => {
+      const m = { setView() { return m; }, on(t, fn) { mapH[t] = fn; }, panTo() {}, fitBounds() {} };
+      return m;
+    },
+    tileLayer: () => ({ addTo() { return this; } }),
+    control: { zoom: () => ({ addTo() {} }) },
+    layerGroup: () => {
+      const g = { markers: [], addTo() { return this; }, clearLayers() { g.markers = []; }, addLayer() {} };
+      layers.push(g);
+      return g;
+    },
+    divIcon: o => o,
+    marker: (ll) => {
+      const m = {
+        ll, _fn: null,
+        on(t, fn) { this._fn = fn; return this; },
+        bindTooltip() { return this; },
+        addTo(layer) { layer.markers.push(this); return this; },
+      };
+      return m;
+    },
+  };
+
+  const fetchStub = async (url, opts = {}) => {
+    const u = String(url);
+    if (u.includes('nominatim')) return { json: async () => nominatimReply.v };
+    const out = opts.method === 'POST'
+      ? gas.ctx.doPost({ postData: { contents: opts.body } })
+      : gas.ctx.doGet({ parameter: { action: new URL(u).searchParams.get('action') } });
+    return { json: async () => JSON.parse(out.s) };
+  };
+
+  const sandbox = {
+    document,
+    console,
+    Date, Math, Number, String, Promise, JSON, Set, Map, Array, Object, Error, RegExp, Intl,
+    setTimeout, clearTimeout,
+    navigator: {},
+    matchMedia: () => ({ matches: false }),
+    requestAnimationFrame: fn => fn(),
+    alert: m => alerts.push(m),
+    confirm: () => confirmAnswer.v,
+    URL: { createObjectURL: () => 'blob:mock', revokeObjectURL() {} },
+    Image: FakeImage,
+    fetch: fetchStub,
+    L,
+  };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(read('config.js'), sandbox);
+  vm.runInContext(read('app.js'), sandbox);
+
+  return {
+    sb: sandbox,
+    els,
+    fields,
+    docL,
+    mapH,
+    alerts,
+    confirmAnswer,
+    nominatimReply,
+    markers: () => layers[0].markers,
+    get: name => vm.runInContext(name, sandbox),
+    // ข้อความที่แอพเขียนด้วย textContent (สถานะ, ข้อผิดพลาด) หรือ innerHTML
+    html: id => els[id]?.innerHTML || els[id]?.textContent || '',
+    cls: id => els[id]?.classList,
+  };
+}
+
+// helper: ตัวจำลองเป้าหมายของเหตุการณ์คลิก
+const tgt = (dataset, match) => ({
+  dataset,
+  closest: sel => (match === undefined || sel === match ? { dataset } : null),
+});
+
+async function main() {
+  // ================= 1. Code.gs =================
+  console.log('\n== 1. Code.gs (backend บน Google Sheet จำลอง) ==');
+  const ss = makeSpreadsheet();
+  const gas = loadCodeGs(ss);
+  const call = body => JSON.parse(gas.ctx.doPost({ postData: { contents: JSON.stringify(body) } }).s);
+  const listRaw = () => JSON.parse(gas.ctx.doGet({ parameter: { action: 'list' } }).s);
+  const base = (o = {}) => ({
+    name: 'ดอยอินทนนท์', category: 'ธรรมชาติ', province: 'เชียงใหม่',
+    lat: 18.58, lng: 98.48, rating: 5, visited: '', description: '', photos: [], ...o,
+  });
+
+  check('เขียนโดยไม่มี secret ถูกปฏิเสธ', call({ action: 'add', secret: 'x', place: base() }).ok === false);
+  check('add วันเดียวสำเร็จ', call({ action: 'add', secret: '1142', place: base({ visited: '2026-10-25' }) }).ok === true);
+  check('อ่านวันเดียวกลับมาเป็น yyyy-mm-dd', listRaw().places[0].visited === '2026-10-25',
+    JSON.stringify(listRaw().places[0]?.visited));
+  check('คอลัมน์ visited เก็บเป็นข้อความ (ไม่ถูกแปลงเป็นวันที่)',
+    typeof ss._sheets.places._grid[1][8] === 'string', typeof ss._sheets.places._grid[1][8]);
+
+  call({ action: 'add', secret: '1142', place: base({ name: 'ปาย', visited: '2026-10-25,2026-10-26,2026-10-27' }) });
+  const two = listRaw().places;
+  check('เก็บหลายวันแล้วอ่านกลับครบ', two[1].visited === '2026-10-25,2026-10-26,2026-10-27', two[1].visited);
+  check('มี 2 สถานที่', two.length === 2);
+
+  const id0 = two[0].id;
+  const created = ss._sheets.places._grid[1][10];
+  check('update สำเร็จ', call({ action: 'update', secret: '1142', place: { ...base({ name: 'ดอยอินทนนท์ (แก้)', visited: '2026-11-01' }), id: id0 } }).ok);
+  const upd = listRaw().places.find(p => p.id === id0);
+  check('update เปลี่ยนชื่อ', upd.name === 'ดอยอินทนนท์ (แก้)');
+  check('update เปลี่ยนวันที่', upd.visited === '2026-11-01', upd.visited);
+  check('update ไม่แก้ created_at', ss._sheets.places._grid[1][10] === created);
+  check('update id ที่ไม่มีอยู่ถูกปฏิเสธ', call({ action: 'update', secret: '1142', place: { ...base(), id: 'nope' } }).ok === false);
+  call({ action: 'add', secret: '1142', place: base({ name: '=HYPERLINK("x")' }) });
+  const injected = ss._sheets.places._grid.at(-1)[1];
+  check('ข้อความที่ขึ้นต้นด้วย = ถูกทำให้เป็นข้อความ', injected.startsWith("'="), injected);
+  check('ลบสถานที่สำเร็จ', call({ action: 'delete', secret: '1142', id: two[1].id }).ok);
+  check('หลังลบเหลือ 2 แถว (รวมที่เพิ่ง add)', listRaw().places.length === 2, listRaw().places.length);
+  check('action ไม่รู้จักถูกปฏิเสธ', call({ action: 'zzz', secret: '1142' }).ok === false);
+  const up = call({ action: 'upload', secret: '1142', filename: 'a.jpg', mimeType: 'image/jpeg', data: Buffer.from('hi').toString('base64') });
+  check('upload รูปได้ url', up.ok && up.url.startsWith('https://lh3.googleusercontent.com/d/FILE'), JSON.stringify(up));
+  ss._sheets.places._grid.push(['legacy', 'เก่า', 'อื่นๆ', '', 13, 100, '', 0, new Date(2026, 9, 25), '', '', '']);
+  const legacy = listRaw().places.find(p => p.id === 'legacy');
+  check('แถวเก่าที่เป็น Date อ่านได้เป็น yyyy-mm-dd', legacy?.visited === '2026-10-25', legacy?.visited);
+
+  // ================= 2. app.js =================
+  console.log('\n== 2. app.js (หน้าเว็บ) ==');
+  const app = loadApp(gas);
+  await flush();
+  const { get } = app;
+
+  const N = listRaw().places.length;
+  check('โหลดสถานที่มาแสดงเป็นหมุด', app.markers().length === N, `หมุด=${app.markers().length}`);
+  check('แสดงจำนวนในสถานะ', app.html('status') === `${N} สถานที่`, app.html('status'));
+  check('มีตัวเลือกจังหวัดครบ (77)', (app.html('f-prov').match(/<option>/g) || []).length === 77, String((app.html('f-prov').match(/<option>/g) || []).length));
+
+  // --- filter ---
+  await app.els.chips.dispatch('click', { target: tgt({ cat: 'ที่พัก' }, '[data-cat]') });
+  check('กรองหมวด "ที่พัก" ไม่มีอะไรตรง', app.markers().length === 0, `หมุด=${app.markers().length}`);
+  check('สถานะบอกจำนวนที่กรอง', app.html('status').includes(`จาก ${N}`), app.html('status'));
+  await app.els.chips.dispatch('click', { target: tgt({ cat: '' }, '[data-cat]') });
+  check('เลือก "ทั้งหมด" กลับมาครบ', app.markers().length === N);
+
+  // --- search ---
+  app.els.search.value = 'ดอยอิน';
+  await app.els.search.dispatch('input');
+  check('ค้นหาด้วยชื่อ', app.markers().length === 1);
+  app.els.search.value = 'ไม่มีจริง';
+  await app.els.search.dispatch('input');
+  check('ค้นหาไม่เจอ = 0', app.markers().length === 0);
+  app.els.search.value = '';
+  await app.els.search.dispatch('input');
+
+  // --- detail ---
+  const m0 = app.markers()[0];
+  m0._fn();
+  check('คลิกหมุดเปิดหน้ารายละเอียด', app.cls('detail').contains('open'));
+  check('หน้ารายละเอียดมีชื่อสถานที่', app.html('detail-body').includes('<h2>ดอยอินทนนท์ (แก้)</h2>'));
+  check('ไม่มีคำว่า Invalid Date ในหน้ารายละเอียด', !/Invalid/i.test(app.html('detail-body')));
+  check('ปุ่มนำทางมีพิกัด', app.html('detail-body').includes('destination='));
+  check('closeDetail ด้วย Escape', (app.docL.keydown[0]({ key: 'Escape' }), !app.cls('detail').contains('open')));
+
+  // --- add place via map ---
+  await app.els['btn-add'].dispatch('click');
+  check('กดเพิ่มสถานที่เข้าโหมดปักหมุด', app.cls('body').contains('picking'));
+  check('แบนเนอร์โหมดปักหมุดแสดงอยู่', app.els['pick-banner'].hidden === false);
+  app.nominatimReply.v = { address: { state: 'จังหวัดเชียงใหม่' } };
+  app.mapH.click({ latlng: { lat: 18.79, lng: 98.98 } });
+  check('แตะแผนที่แล้วเปิดฟอร์ม', app.cls('editor').contains('open'));
+  check('แตะแผนที่แล้วกรอกพิกัดให้', app.fields.lat.value === '18.790000', app.fields.lat.value);
+  check('ปิดโหมดปักหมุดหลังแตะแผนที่', !app.cls('body').contains('picking'));
+  await flush();
+  check('ตรวจจังหวัดอัตโนมัติจากพิกัด (ตัดคำว่า "จังหวัด" ออก)', app.fields.province.value === 'เชียงใหม่', app.fields.province.value);
+  check('มีข้อความบอกว่าตรวจจากพิกัดแล้ว', app.html('prov-hint').includes('ตรวจจากพิกัด'));
+
+  app.fields.name.value = 'ดอยสุเทพ';
+  app.fields.description.value = 'วิวเมือง';
+  await app.els['form-cats'].dispatch('click', { target: tgt({ cat: 'วัด/ศาสนสถาน' }, '[data-cat]') });
+  check('เลือกหมวดหมู่ได้', app.fields.category.value === 'วัด/ศาสนสถาน');
+  await app.els['form-stars'].dispatch('click', { target: tgt({ n: '4' }, '[data-n]') });
+  check('ให้คะแนน 4 ดาว', get('rating') === 4);
+  await app.els['form-stars'].dispatch('click', { target: tgt({ n: '4' }, '[data-n]') });
+  check('กดดาวเดิมซ้ำเพื่อล้างคะแนน', get('rating') === 0);
+  await app.els['form-stars'].dispatch('click', { target: tgt({ n: '4' }, '[data-n]') });
+
+  // วันเดียว: เลือกแล้วเพิ่มให้ทันที
+  app.els['date-from'].value = '2026-10-25';
+  await app.els['date-from'].dispatch('change');
+  check('เลือกวันเดียวแล้วเพิ่มเข้ารายการทันที', JSON.stringify(get('dates')) === '["2026-10-25"]', JSON.stringify(get('dates')));
+  check('ช่องวันถูกล้างหลังเพิ่ม', app.els['date-from'].value === '');
+  check('ชิปวันที่แสดงเป็นภาษาไทย', app.html('date-chips').includes('ต.ค.'), app.html('date-chips'));
+
+  // ค้างคืน: ติ๊กแล้วเลือกถึงวันที่
+  app.els['stay-toggle'].checked = true;
+  await app.els['stay-toggle'].dispatch('change');
+  check('ติ๊กค้างคืนแล้วแสดงช่องถึงวันที่', app.els['stay-box'].hidden === false);
+  app.els['date-from'].value = '2026-10-27';
+  await app.els['date-from'].dispatch('change');
+  check('ค้างคืนยังไม่เพิ่มจนกว่าจะเลือกถึงวันที่', get('dates').length === 1);
+  app.els['date-to'].value = '2026-10-28';
+  await app.els['date-to'].dispatch('change');
+  check('ค้างคืนเพิ่มทั้งช่วง (27–28)', JSON.stringify(get('dates')) === '["2026-10-25","2026-10-27","2026-10-28"]', JSON.stringify(get('dates')));
+  check('ปิดค้างคืนหลังเพิ่มแล้ว', app.els['stay-box'].hidden === true && app.els['stay-toggle'].checked === false);
+
+  // ค้างคืนแต่ไม่เลือกถึงวันที่
+  app.els['stay-toggle'].checked = true;
+  await app.els['stay-toggle'].dispatch('change');
+  app.els['date-from'].value = '2026-10-30';
+  app.els['date-to'].value = '';
+  await app.els['btn-add-date'].dispatch('click');
+  check('ค้างคืนไม่เลือกถึงวันที่ แสดงข้อความเตือน', app.html('form-error').includes('ถึงวันที่'), app.html('form-error'));
+
+  // ถึงวันที่ก่อนวันที่ไป
+  app.els['date-to'].value = '2026-10-29';
+  await app.els['btn-add-date'].dispatch('click');
+  check('ถึงวันที่ก่อนวันที่ไปถูกปฏิเสธ', app.html('form-error').includes('ต้องไม่ก่อน'), app.html('form-error'));
+  app.els['stay-toggle'].checked = false;
+  await app.els['stay-toggle'].dispatch('change');
+  app.els['date-from'].value = '';
+  app.els['date-to'].value = '';
+
+  // ปุ่ม + เพิ่มวัน ตอนไม่ได้เลือกวัน
+  await app.els['btn-add-date'].dispatch('click');
+  check('กด + เพิ่มวัน โดยไม่เลือกวัน แจ้งเตือน', app.html('form-error').includes('เลือกวันที่ก่อน'));
+
+  // วันที่ค้างในช่องแต่ยังไม่กดเพิ่ม ต้องถูกบันทึกด้วย
+  app.els['date-from'].value = '2026-12-31';
+  check('วันที่ค้างในช่องยังไม่เพิ่ม (ก่อนบันทึก)', get('dates').length === 3);
+
+  // รูปภาพ
+  await app.els['photo-grid'].dispatch('change', { target: { type: 'file', files: [{ name: 'a.jpg' }], value: '' } });
+  check('เลือกรูปแล้วขึ้นพรีวิว', app.html('photo-grid').includes('tile-x') && get('previewUrls').length === 1);
+
+  // บันทึก
+  app.fields.name.value = 'ดอยสุเทพ';
+  await app.els.form.dispatch('submit', {});
+  await flush();
+  const afterAdd = listRaw().places;
+  const added = afterAdd.find(p => p.name === 'ดอยสุเทพ');
+  check('บันทึกสถานที่ใหม่ลง Sheet', !!added);
+  check('วันที่ที่บันทึกเรียงและไม่ซ้ำ', added?.visited === '2026-10-25,2026-10-27,2026-10-28,2026-12-31', added?.visited);
+  check('หมวด/จังหวัด/คะแนน ถูกบันทึก', added?.category === 'วัด/ศาสนสถาน' && added?.province === 'เชียงใหม่' && added?.rating === 4, JSON.stringify([added?.category, added?.province, added?.rating]));
+  check('รูปถูกอัปโหลดและบันทึก URL', added?.photos?.length === 1 && added.photos[0].startsWith('https://lh3'), JSON.stringify(added?.photos));
+  check('ฟอร์มปิดหลังบันทึกสำเร็จ', !app.cls('editor').contains('open'));
+  check('ชิปวันที่ในฐานข้อมูลเป็นชนิดข้อความ', typeof ss._sheets.places._grid.find(r => r[1] === 'ดอยสุเทพ')[8] === 'string');
+
+  // --- validation ---
+  app.mapH.click({ latlng: { lat: 18.79, lng: 98.98 } });
+  app.fields.name.value = '';
+  await app.els.form.dispatch('submit', {});
+  check('ไม่กรอกชื่อ แจ้งเตือน', app.html('form-error').includes('ชื่อ'), app.html('form-error'));
+  app.fields.name.value = 'ทดสอบ';
+  app.fields.lat.value = '';
+  await app.els.form.dispatch('submit', {});
+  check('ไม่มีพิกัด แจ้งเตือน', app.html('form-error').includes('พิกัด'), app.html('form-error'));
+  app.fields.lat.value = '';
+  app.els['btn-cancel'].dispatch('click');
+  await sleep(340);
+  check('ปุ่มยกเลิกปิดฟอร์ม', !app.cls('editor').contains('open'));
+
+  // --- edit / detail / lightbox / delete ---
+  const pl = listRaw().places;
+  const newMarker = app.markers().find(m => Math.abs(m.ll[0] - 18.79) < 1e-6);
+  check('หมุดของสถานที่ใหม่แสดงบนแผนที่', !!newMarker);
+  newMarker._fn();
+  await flush();
+  const dlist = app.html('detail-body');
+  check('หน้ารายละเอียดของที่ใหม่แสดงวันที่ทุกวัน', dlist.includes('ต.ค.') && dlist.includes('ธ.ค.'), dlist.slice(0, 300));
+  check('หน้ารายละเอียดของที่ใหม่ไม่มี Invalid', !/Invalid/i.test(dlist));
+
+  // รูปเต็มจอ
+  await app.els.detail.dispatch('click', { target: tgt({ i: '0' }, '.hero img') });
+  check('กดรูปแล้วเปิดดูเต็มจอ', app.els.lightbox.hidden === false);
+  check('เต็มจอแสดงจำนวนรูป (ซ่อนเมื่อรูปเดียว)', app.html('lb-count') === '' || app.html('lb-count') === '1 / 1');
+  app.els['lb-close'].dispatch('click');
+  check('ปิดรูปเต็มจอได้', app.els.lightbox.hidden === true);
+
+  // แก้ไข
+  await app.els.detail.dispatch('click', { target: tgt({ act: 'edit' }, '[data-act]') });
+  check('ปุ่มแก้ไขเปิดฟอร์มพร้อมข้อมูลเดิม', app.fields.name.value === 'ดอยสุเทพ' && app.cls('editor').contains('open'));
+  check('ฟอร์มแก้ไขแสดงวันที่เดิม', JSON.stringify(get('dates')) === '["2026-10-25","2026-10-27","2026-10-28","2026-12-31"]', JSON.stringify(get('dates')));
+  check('ฟอร์มแก้ไขเก็บรูปเดิม', get('keptPhotos').length === 1);
+  app.fields.name.value = 'ดอยสุเทพ (แก้)';
+  await app.els.form.dispatch('submit', {});
+  await flush();
+  const edited = listRaw().places.find(p => p.name === 'ดอยสุเทพ (แก้)');
+  check('บันทึกการแก้ไขลง Sheet', !!edited);
+  check('การแก้ไขไม่ทำให้วันที่หาย', edited?.visited === '2026-10-25,2026-10-27,2026-10-28,2026-12-31', edited?.visited);
+  check('การแก้ไขไม่ทำให้รูปหาย', edited?.photos?.length === 1);
+
+  // ลบ
+  const target = app.markers().find(m => Math.abs(m.ll[0] - 18.79) < 1e-6);
+  target._fn();
+  await app.els.detail.dispatch('click', { target: tgt({ act: 'delete' }, '[data-act]') });
+  await flush();
+  check('ลบสถานที่แล้วหายจากหน้าเว็บ', !listRaw().places.some(p => p.name === 'ดอยสุเทพ (แก้)'));
+  check('หลังลบเหลือหมุดเท่าที่มีจริง', app.markers().length === listRaw().places.length, `${app.markers().length} vs ${listRaw().places.length}`);
+
+  // --- helper functions ---
+  console.log('\n== 3. ฟังก์ชันช่วย ==');
+  check('splitDates ข้ามค่าที่อ่านไม่ได้และตัดซ้ำ', JSON.stringify(get("splitDates('2026-10-25, abc, ,2026-10-25,2026-10-26')")) === '["2026-10-25","2026-10-26"]');
+  check('splitDates แปลง Date ที่เป็นข้อความยาวได้', JSON.stringify(get(`splitDates('${new Date(2026, 9, 25).toString()}')`)) === '["2026-10-25"]');
+  check('splitDates ค่าว่างคืนอาร์เรย์ว่าง', JSON.stringify(get("splitDates('')")) === '[]');
+  check('fmtDate แสดงเป็นภาษาไทย', get("fmtDate('2026-10-25')").includes('ต.ค.'), get("fmtDate('2026-10-25')"));
+  check('rangeDays ข้ามเดือนและรองรับปีอธิกสุรทิน', JSON.stringify(get("rangeDays('2028-02-28','2028-03-01')")) === '["2028-02-28","2028-02-29","2028-03-01"]');
+  check('rangeDays วันเดียว', JSON.stringify(get("rangeDays('2026-10-25','2026-10-25')")) === '["2026-10-25"]');
+
+  console.log(`\nผ่าน ${passed} / ${passed + failed}`);
+  if (failed) process.exitCode = 1;
+}
+
+main().catch(err => {
+  console.error('ทดสอบล้มเหลวกลางทาง:', err);
+  process.exitCode = 1;
+});

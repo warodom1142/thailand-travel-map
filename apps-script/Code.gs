@@ -120,11 +120,19 @@ function findRow(sh, id) {
 
 // ---------- CRUD ----------
 
+// เขียนแถวลงชีท โดยตั้งคอลัมน์ visited เป็น "ข้อความ" ก่อน
+// ไม่งั้น Google Sheet จะแปลง "2026-10-25" เป็นวันที่เอง และค่าหลายวันจะเพี้ยน
+function writeRow(sh, rowIdx, row) {
+  const VISITED_COL = HEADERS.indexOf('visited') + 1;
+  sh.getRange(rowIdx, VISITED_COL).setNumberFormat('@');
+  sh.getRange(rowIdx, 1, 1, HEADERS.length).setValues([row]);
+}
+
 function addPlace(p) {
   const sh = getSheet();
   const now = new Date().toISOString();
   const row = rowFor({ ...p, id: Utilities.getUuid() }, now, now);
-  sh.appendRow(row);
+  writeRow(sh, Math.max(sh.getLastRow(), 1) + 1, row);
   return { id: row[0] };
 }
 
@@ -132,9 +140,8 @@ function updatePlace(p) {
   const sh = getSheet();
   const idx = findRow(sh, p.id);
   if (idx < 0) throw new Error('ไม่พบสถานที่นี้');
-  const created = sh.getRange(idx, 11).getValue();
-  sh.getRange(idx, 1, 1, HEADERS.length)
-    .setValues([rowFor(p, created, new Date().toISOString())]);
+  const created = sh.getRange(idx, HEADERS.indexOf('created_at') + 1).getValue();
+  writeRow(sh, idx, rowFor(p, created, new Date().toISOString()));
   return { id: p.id };
 }
 
