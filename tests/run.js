@@ -42,6 +42,7 @@ function makeSpreadsheet(tz = 'Asia/Bangkok') {
       getValues: () => Array.from({ length: nr }, (_, i) =>
         Array.from({ length: nc }, (_, j) => ((grid[r - 1 + i] || [])[c - 1 + j] ?? ''))),
       getValue: () => ((grid[r - 1] || [])[c - 1] ?? ''),
+      setValue: v => { grid[r - 1] = grid[r - 1] || []; grid[r - 1][c - 1] = v; },
       setValues: vals => vals.forEach((row, i) => {
         const ri = r + i - 1;
         grid[ri] = grid[ri] || [];
@@ -74,8 +75,29 @@ function makeSpreadsheet(tz = 'Asia/Bangkok') {
 function loadCodeGs(ss) {
   const src = read('apps-script/Code.gs')
     .replace("const SECRET = 'change-me';", "const SECRET = '1142';")
-    .replace("'PUT_DRIVE_FOLDER_ID_HERE'", "'FOLDER_TEST'");
-  const uploads = [];
+    .replace(/const PHOTO_FOLDER_ID = '[^']*'/, "const PHOTO_FOLDER_ID = 'FOLDER_TEST'");
+  let fileSeq = 0;
+  let folderSeq = 0;
+  const drive = { folders: [] };
+  const makeFolder = (id, name) => {
+    const f = {
+      id, name, files: [], trashed: false,
+      getId: () => f.id,
+      isTrashed: () => f.trashed,
+      createFile: blob => {
+        const fid = 'FILE' + (++fileSeq);
+        f.files.push({ id: fid, blob });
+        return { getId: () => fid, setSharing() {} };
+      },
+      createFolder: n => {
+        const sub = makeFolder('F' + (++folderSeq), n);
+        drive.folders.push(sub);
+        return sub;
+      },
+    };
+    return f;
+  };
+  const rootFolder = makeFolder('FOLDER_TEST', 'root');
   const ctx = {
     SpreadsheetApp: { getActiveSpreadsheet: () => ss },
     ContentService: {
@@ -95,18 +117,18 @@ function loadCodeGs(ss) {
     DriveApp: {
       Access: { ANYONE_WITH_LINK: 'anyone' },
       Permission: { VIEW: 'view' },
-      getFolderById: () => ({
-        createFile: blob => {
-          uploads.push(blob);
-          return { getId: () => 'FILE' + uploads.length, setSharing() {} };
-        },
-      }),
+      getFolderById: id => {
+        if (id === 'FOLDER_TEST') return rootFolder;
+        const f = drive.folders.find(x => x.id === id);
+        if (!f) throw new Error('Folder not found: ' + id);
+        return f;
+      },
     },
     Date, JSON, Math, Number, String, Array, Object, Error, RegExp, Buffer, crypto,
   };
   vm.createContext(ctx);
   vm.runInContext(src, ctx);
-  return { ctx, uploads };
+  return { ctx, drive };
 }
 
 // ---------- DOM จำลองสำหรับ app.js ----------
@@ -227,6 +249,11 @@ function loadApp(gas) {
     confirm: () => confirmAnswer.v,
     URL: { createObjectURL: () => 'blob:mock', revokeObjectURL() {} },
     Image: FakeImage,
+    FileReader: class {
+      readAsDataURL() {
+        setTimeout(() => { this.result = 'data:video/mp4;base64,QUJD'; this.onload && this.onload(); }, 0);
+      }
+    },
     fetch: fetchStub,
     L,
   };
@@ -524,6 +551,69 @@ async function main() {
   check('fmtRange ข้ามปี (พ.ศ. 2570)', get("fmtRange(['2026-12-31','2027-01-01'])") === '31 ธ.ค. 69 – 1 ม.ค. 70', get("fmtRange(['2026-12-31','2027-01-01'])"));
   check('fmtRange วันไม่ต่อเนื่องแสดงทีละวัน', get("fmtRange(['2026-10-09','2026-10-11'])") === '9 ต.ค. 69, 11 ต.ค. 69');
   check('fmtRange ลิสต์ว่างได้ข้อความว่าง', get("fmtRange([])") === '');
+
+  // ================= 4. โฟลเดอร์ทริป / วิดีโอ / ลบ =================
+  console.log('\n== 4. โฟลเดอร์ทริป วิดีโอ และการลบ ==');
+  const drv = gas.drive;
+  const countFiles = () => drv.folders.reduce((n, f) => n + f.files.length, 0);
+  await app.els['btn-add'].dispatch('click');
+  app.mapH.click({ latlng: { lat: 19.0, lng: 99.0 } });
+  app.fields.name.value = 'วัดร่องขุ่น';
+  app.fields.province.value = 'เชียงราย';
+  app.els['date-from'].value = '2026-11-10';
+  await app.els['date-from'].dispatch('change');
+  await app.els['photo-grid'].dispatch('change', { target: { type: 'file', files: [
+    { name: 'a.jpg', type: 'image/jpeg', size: 10 },
+    { name: 'trip.mp4', type: 'video/mp4', size: 5000 },
+  ], value: '' } });
+  await app.els.form.dispatch('submit', {});
+  await flush();
+  const trip = listRaw().places.find(p => p.name === 'วัดร่องขุ่น');
+  check('สร้างโฟลเดอร์ชื่อ "เชียงราย 2026-11-10"', drv.folders.some(f => f.name === 'เชียงราย 2026-11-10'));
+  check('ทริปเก็บ folder_id ไว้ในชีท', !!trip?.folder_id, JSON.stringify(trip));
+  const tripFolder = drv.folders.find(f => f.id === trip?.folder_id);
+  check('รูปและวิดีโอของทริปอยู่โฟลเดอร์เดียวกัน', tripFolder?.files.length === 2, String(tripFolder?.files.length));
+  check('วิดีโอได้ลิงก์ preview ของ Drive', trip.photos.some(u => u.includes('drive.google.com/file/d/') && u.endsWith('/preview')), JSON.stringify(trip.photos));
+  check('รูปได้ลิงก์ lh3', trip.photos.some(u => u.includes('lh3.googleusercontent.com')));
+
+  const foldersBefore = drv.folders.length;
+  const mkTrip = app.markers().find(m => Math.abs(m.ll[0] - 19.0) < 1e-6);
+  mkTrip._fn();
+  await app.els.detail.dispatch('click', { target: tgt({ act: 'edit' }, '[data-act]') });
+  await app.els['photo-grid'].dispatch('change', { target: { type: 'file', files: [{ name: 'b.jpg', type: 'image/jpeg', size: 10 }], value: '' } });
+  await app.els.form.dispatch('submit', {});
+  await flush();
+  check('แก้ไขแล้วเพิ่มรูปใช้โฟลเดอร์เดิม ไม่สร้างซ้ำ', drv.folders.length === foldersBefore, `${foldersBefore} → ${drv.folders.length}`);
+  check('รูปใหม่ตามเข้าโฟลเดอร์เดิม', tripFolder.files.length === 3, String(tripFolder.files.length));
+
+  mkTrip._fn();
+  await flush();
+  check('รายละเอียดแสดงวิดีโอเป็นช่อง ▶', app.html('detail-body').includes('video-cell'));
+  check('รายละเอียดนับรูปรวมวิดีโอ "📷 3 รูป"', app.html('detail-body').includes('📷 3 รูป'));
+  get("openLightbox(['https://drive.google.com/file/d/X/preview'], 0)");
+  check('เปิดวิดีโอเต็มจอด้วย iframe', app.els['lb-track'].innerHTML.includes('<iframe'));
+  app.els['lb-close'].dispatch('click');
+
+  // ลบทริปแล้วรูปในไดรฟ์ยังอยู่
+  const filesBeforeDelete = countFiles();
+  mkTrip._fn();
+  await app.els.detail.dispatch('click', { target: tgt({ act: 'delete' }, '[data-act]') });
+  await flush();
+  check('ลบทริปแล้วไฟล์ในไดรฟ์ยังอยู่ทั้งหมด', countFiles() === filesBeforeDelete, `${filesBeforeDelete} → ${countFiles()}`);
+  check('ทริปที่ลบหายจากชีท', !listRaw().places.some(p => p.name === 'วัดร่องขุ่น'));
+
+  // โฟลเดอร์ที่ถูกลบไปแล้วต้องสร้างใหม่ ไม่ล้มเหลว
+  tripFolder.trashed = true;
+  const re = call({ action: 'upload', secret: '1142', filename: 'c.jpg', mimeType: 'image/jpeg', data: Buffer.from('x').toString('base64'), folderId: tripFolder.id, folderName: 'ทดสอบ' });
+  check('โฟลเดอร์ในถังขยะถูกแทนด้วยโฟลเดอร์ใหม่', re.ok && re.folderId !== tripFolder.id, JSON.stringify(re));
+
+  // ชีทเก่าที่ไม่มีคอลัมน์ folder_id ต้องถูกเพิ่มให้เอง
+  const ss2 = makeSpreadsheet();
+  const oldSheet = ss2.insertSheet('places');
+  oldSheet.appendRow(['id','name','category','province','lat','lng','description','rating','visited','photos','created_at','updated_at']);
+  const gas2 = loadCodeGs(ss2);
+  gas2.ctx.doGet({ parameter: { action: 'list' } });
+  check('ชีทเก่าได้หัวคอลัมน์ folder_id เพิ่มอัตโนมัติ', ss2._sheets.places._grid[0][12] === 'folder_id');
 
   console.log(`\nผ่าน ${passed} / ${passed + failed}`);
   if (failed) process.exitCode = 1;

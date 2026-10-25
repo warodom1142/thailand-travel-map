@@ -4,13 +4,13 @@
  *
  * ต้องแก้ 2 ค่าด้านล่างก่อน deploy
  */
-const PHOTO_FOLDER_ID = '18hPgUTsr999zbvjAsObJh9OO1-jnYUxD'; // ID ของโฟลเดอร์ใน Google Drive ที่จะเก็บรูป
-const SECRET = '1142';                          // ต้องตรงกับ config.js
+const PHOTO_FOLDER_ID = '18hPgUTsr999zbvjAsObJh9OO1-jnYUxD'; // โฟลเดอร์หลักใน Google Drive (แต่ละทริปจะมีโฟลเดอร์ย่อยข้างใน)
+const SECRET = '1142';                                       // ต้องตรงกับ config.js
 
 const SHEET_NAME = 'places';
 const HEADERS = [
   'id', 'name', 'category', 'province', 'lat', 'lng', 'description',
-  'rating', 'visited', 'photos', 'created_at', 'updated_at',
+  'rating', 'visited', 'photos', 'created_at', 'updated_at', 'folder_id',
 ];
 
 // ---------- HTTP entry points ----------
@@ -35,7 +35,7 @@ function doPost(e) {
       case 'add':    return json({ ok: true, place: addPlace(body.place) });
       case 'update': return json({ ok: true, place: updatePlace(body.place) });
       case 'delete': deletePlace(body.id); return json({ ok: true });
-      case 'upload': return json({ ok: true, url: uploadPhoto(body) });
+      case 'upload': return json({ ok: true, ...uploadFile(body) });
       default:       return json({ ok: false, error: 'unknown action' });
     }
   } catch (err) {
@@ -55,6 +55,11 @@ function getSheet() {
     sh.appendRow(HEADERS);
     sh.setFrozenRows(1);
   }
+  // ชีทเก่าที่ยังไม่มีคอลัมน์ใหม่ (เช่น folder_id) ให้เพิ่มหัวคอลัมน์ให้อัตโนมัติ
+  const header = sh.getRange(1, 1, 1, HEADERS.length).getValues()[0];
+  HEADERS.forEach((h, i) => {
+    if (!header[i]) sh.getRange(1, i + 1).setValue(h);
+  });
   return sh;
 }
 
@@ -78,6 +83,7 @@ function readAll() {
       rating: Number(o.rating) || 0,
       visited: fmtDate(o.visited, tz),
       photos: String(o.photos || '').split('\n').filter(Boolean),
+      folder_id: String(o.folder_id || ''),
     };
   });
 }
@@ -107,6 +113,7 @@ function rowFor(p, created, updated) {
     (p.photos || []).join('\n'),
     created,
     updated,
+    p.folder_id || '',
   ];
 }
 
@@ -145,23 +152,48 @@ function updatePlace(p) {
   return { id: p.id };
 }
 
+// ลบเฉพาะแถวในชีท รูปในไดรฟ์จะยังอยู่ (กันการลบพลาด)
 function deletePlace(id) {
   const sh = getSheet();
   const idx = findRow(sh, id);
   if (idx > 0) sh.deleteRow(idx);
 }
 
-// ---------- photos ----------
+// ---------- photos & videos ----------
 
-function uploadPhoto(body) {
+// อัปโหลดรูปหรือวิดีโอเข้าโฟลเดอร์ของทริป
+// body: { data (base64), mimeType, filename, folderId?, folderName? }
+// คืนค่า url และ folderId (ใช้ผูกกับทริปต่อไป)
+function uploadFile(body) {
   const blob = Utilities.newBlob(
     Utilities.base64Decode(body.data),
     body.mimeType || 'image/jpeg',
-    body.filename || 'photo.jpg'
+    body.filename || 'file.jpg'
   );
-  const file = DriveApp.getFolderById(PHOTO_FOLDER_ID).createFile(blob);
+  const folder = getTripFolder(body.folderId, body.folderName);
+  const file = folder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return 'https://lh3.googleusercontent.com/d/' + file.getId();
+
+  const isVideo = String(body.mimeType || '').indexOf('video/') === 0;
+  const url = isVideo
+    ? 'https://drive.google.com/file/d/' + file.getId() + '/preview'
+    : 'https://lh3.googleusercontent.com/d/' + file.getId();
+  return { url: url, folderId: folder.getId() };
+}
+
+// ใช้โฟลเดอร์เดิมถ้ายังอยู่ ไม่งั้นสร้างใหม่ใต้โฟลเดอร์หลัก
+function getTripFolder(folderId, folderName) {
+  if (folderId) {
+    try {
+      const existing = DriveApp.getFolderById(folderId);
+      if (!existing.isTrashed()) return existing;
+    } catch (err) {
+      // โฟลเดอร์ถูกลบไปแล้ว ให้สร้างใหม่ด้านล่าง
+    }
+  }
+  const root = DriveApp.getFolderById(PHOTO_FOLDER_ID);
+  const name = String(folderName || 'ทริปใหม่').replace(/[\\/]/g, '-').slice(0, 120);
+  return root.createFolder(name);
 }
 
 // ---------- util ----------

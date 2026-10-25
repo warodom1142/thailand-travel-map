@@ -536,3 +536,31 @@ body.sheet-open .fab { opacity: 0; pointer-events: none; transform: scale(0.8); 
   .pick-banner { top: 124px; }
   .status { left: 24px; bottom: 24px; }
 }
+
+/* ---------- video ---------- */
+.video-tile {
+  display: grid;
+  place-items: center;
+  background: #111827;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+.video-cell { background: #111827; display: grid; place-items: center; cursor: pointer; }
+.video-cell .play {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.9);
+  color: #111827;
+  font-size: 18px;
+  padding-left: 3px;
+}
+.lb-slide iframe {
+  width: min(100%, 960px);
+  height: min(100%, 540px);
+  border: 0;
+  background: #000;
+}

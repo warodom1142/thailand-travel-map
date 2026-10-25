@@ -41,6 +41,11 @@ function toIso(v) {
   return Number.isNaN(d.getTime()) ? '' : isoOf(d);
 }
 const splitDates = v => [...new Set(String(v ?? '').split(',').map(toIso).filter(Boolean))].sort();
+// วิดีโอเก็บเป็นลิงก์ preview ของ Google Drive (…/preview)
+const isDriveVideo = url => String(url || '').includes('drive.google.com/file/d/');
+const isVideoFile = f => String(f.type || '').startsWith('video/');
+const MAX_VIDEO_MB = 40;
+
 const tile = (url, kind, i, idx) =>
   `<div class="tile"><img src="${esc(url)}" data-i="${idx}" alt="">` +
   `<button type="button" class="tile-x" data-kind="${kind}" data-i="${i}" aria-label="ลบรูป">✕</button></div>`;
@@ -93,6 +98,7 @@ const lbTrack = $('lb-track');
 const lbState = { urls: [], index: 0, zs: [], pts: new Map(), drag: null, pinch: null, dragX: 0, lastTap: 0 };
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const curIsVideo = () => isDriveVideo(lbState.urls[lbState.index]);
 
 // วางทุกรูปเรียงกันด้วย transform แล้วคำนวณตำแหน่งตาม index
 function lbApply(animated) {
@@ -103,8 +109,10 @@ function lbApply(animated) {
     slide.style.transform = `translate3d(${(i - index) * w + dragX}px,0,0)`;
     const z = zs[i];
     const img = slide.firstChild;
-    img.style.transition = animated ? 'transform .25s ease' : 'none';
-    img.style.transform = `translate(${z.x}px,${z.y}px) scale(${z.s})`;
+    if (img.tagName === 'IMG') {
+      img.style.transition = animated ? 'transform .25s ease' : 'none';
+      img.style.transform = `translate(${z.x}px,${z.y}px) scale(${z.s})`;
+    }
   });
   $('lb-count').textContent = urls.length > 1 ? `${index + 1} / ${urls.length}` : '';
 }
@@ -112,7 +120,9 @@ function lbApply(animated) {
 function openLightbox(urls, start = 0) {
   if (!urls.length) return;
   Object.assign(lbState, { urls, index: start, zs: urls.map(() => ({ s: 1, x: 0, y: 0 })), dragX: 0, pts: new Map(), drag: null, pinch: null });
-  lbTrack.innerHTML = urls.map(u => `<div class="lb-slide"><img src="${esc(u)}" alt="" draggable="false"></div>`).join('');
+  lbTrack.innerHTML = urls.map(u => (isDriveVideo(u)
+    ? `<div class="lb-slide"><iframe src="${esc(u)}" allow="autoplay; fullscreen" allowfullscreen></iframe></div>`
+    : `<div class="lb-slide"><img src="${esc(u)}" alt="" draggable="false"></div>`)).join('');
   lb.hidden = false;
   lbApply(false);
 }
@@ -149,14 +159,14 @@ lb.addEventListener('pointerdown', e => {
   const z = lbState.zs[lbState.index];
   if (lbState.pts.size === 1) {
     const now = Date.now();
-    if (now - lbState.lastTap < 300) {
+    if (now - lbState.lastTap < 300 && !curIsVideo()) {
       lbState.lastTap = 0;
       lbState.drag = null;
       return toggleZoom();
     }
     lbState.lastTap = now;
     lbState.drag = { x: e.clientX, y: e.clientY, zx: z.x, zy: z.y, t: now };
-  } else if (lbState.pts.size === 2) {
+  } else if (lbState.pts.size === 2 && !curIsVideo()) {
     const [a, b] = [...lbState.pts.values()];
     lbState.pinch = { d: dist(a, b), s: z.s };
     lbState.drag = null;
@@ -167,7 +177,7 @@ lb.addEventListener('pointermove', e => {
   if (!lbState.pts.has(e.pointerId)) return;
   lbState.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
   const z = lbState.zs[lbState.index];
-  if (lbState.pts.size === 2 && lbState.pinch) {
+  if (lbState.pts.size === 2 && lbState.pinch && !curIsVideo()) {
     const [a, b] = [...lbState.pts.values()];
     z.s = clamp(lbState.pinch.s * dist(a, b) / lbState.pinch.d, 1, 5);
     clampPan(z);
@@ -175,7 +185,7 @@ lb.addEventListener('pointermove', e => {
   } else if (lbState.pts.size === 1 && lbState.drag) {
     const dx = e.clientX - lbState.drag.x;
     const dy = e.clientY - lbState.drag.y;
-    if (z.s > 1) {
+    if (z.s > 1 && !curIsVideo()) {
       z.x = lbState.drag.zx + dx;
       z.y = lbState.drag.zy + dy;
       clampPan(z);
@@ -312,6 +322,9 @@ function collageHtml(photos, c) {
   const layout = ['', 'one', 'two', 'three'][n] || 'four';
   const cells = photos.slice(0, 4).map((u, i) => {
     const more = i === 3 && n > 4 ? `<span class="more">+${n - 4}</span>` : '';
+    if (isDriveVideo(u)) {
+      return `<button type="button" class="cell video-cell" data-i="${i}"><span class="play">▶</span>${more}</button>`;
+    }
     return `<button type="button" class="cell" data-i="${i}"><img src="${esc(u)}" loading="lazy" alt="">${more}</button>`;
   }).join('');
   return `<div class="collage ${layout}">${cells}<span class="photo-count">📷 ${n} รูป</span></div>`;
@@ -357,7 +370,7 @@ $('detail').addEventListener('click', e => {
 });
 
 async function removePlace(p) {
-  if (!confirm(`ลบ "${p.name}" ใช่ไหม?`)) return;
+  if (!confirm(`ลบ "${p.name}" ออกจากรายการ?\n(รูปและวิดีโอในไดรฟ์จะยังอยู่)`)) return;
   try {
     await api('delete', { id: p.id }, true);
     hide('detail');
@@ -490,12 +503,18 @@ $('btn-clear-date').addEventListener('click', () => {
 });
 
 function renderPhotos() {
-  const newUrls = newFiles.map(f => URL.createObjectURL(f));
-  previewUrls = [...keptPhotos, ...newUrls];
+  previewUrls = [...keptPhotos];
+  const kept = keptPhotos.map((u, i) => tile(u, 'kept', i, i)).join('');
+  const added = newFiles.map((f, i) => {
+    if (isVideoFile(f)) {
+      return `<div class="tile video-tile"><span>🎬 วิดีโอ</span><button type="button" class="tile-x" data-kind="new" data-i="${i}" aria-label="ลบ">✕</button></div>`;
+    }
+    const url = URL.createObjectURL(f);
+    previewUrls.push(url);
+    return tile(url, 'new', i, previewUrls.length - 1);
+  }).join('');
   $('photo-grid').innerHTML =
-    keptPhotos.map((u, i) => tile(u, 'kept', i, i)).join('') +
-    newUrls.map((u, i) => tile(u, 'new', i, keptPhotos.length + i)).join('') +
-    `<label class="add-tile">+<input type="file" accept="image/*" multiple class="sr-only"></label>`;
+    kept + added + `<label class="add-tile">+<input type="file" accept="image/*,video/*" multiple class="sr-only"></label>`;
 }
 
 $('photo-grid').addEventListener('change', e => {
@@ -605,12 +624,32 @@ function showFormError(msg) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function uploadPhoto(file) {
-  const dataUrl = await resizeImage(file);
-  const data = dataUrl.split(',')[1];
-  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-  const { url } = await api('upload', { filename, mimeType: 'image/jpeg', data }, true);
-  return url;
+// อัปโหลดรูปหรือวิดีโอเข้าโฟลเดอร์ของทริป คืนค่า url และ folderId ใหม่
+async function uploadFile(file, folderId, folderName) {
+  let data;
+  let mimeType;
+  if (isVideoFile(file)) {
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) throw new Error(`วิดีโอใหญ่เกิน ${MAX_VIDEO_MB} MB`);
+    data = await readAsBase64(file);
+    mimeType = file.type || 'video/mp4';
+  } else {
+    const dataUrl = await resizeImage(file);
+    data = dataUrl.split(',')[1];
+    mimeType = 'image/jpeg';
+  }
+  const ext = isVideoFile(file) ? (file.name?.split('.').pop() || 'mp4') : 'jpg';
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const res = await api('upload', { filename, mimeType, data, folderId, folderName }, true);
+  return { url: res.url, folderId: res.folderId };
+}
+
+function readAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1]);
+    r.onerror = () => reject(new Error('อ่านไฟล์วิดีโอไม่ได้'));
+    r.readAsDataURL(file);
+  });
 }
 
 function resizeImage(file, max = 1600) {
@@ -652,9 +691,14 @@ form.addEventListener('submit', async e => {
   showBusy('กำลังเตรียมบันทึก…');
   try {
     const photos = [...keptPhotos];
+    // โฟลเดอร์ของทริปตั้งชื่อตาม "จังหวัด วันที่แรก" เช่น "เชียงใหม่ 2026-10-25"
+    let folderId = editing?.folder_id || '';
+    const folderName = `${f.province.value || 'ไม่ระบุจังหวัด'} ${dates[0] || 'ไม่ระบุวันที่'}`;
     for (let i = 0; i < newFiles.length; i++) {
-      showBusy('กำลังอัปโหลดรูปภาพ', `${i + 1} จาก ${newFiles.length} รูป`);
-      photos.push(await uploadPhoto(newFiles[i]));
+      showBusy(isVideoFile(newFiles[i]) ? 'กำลังอัปโหลดวิดีโอ' : 'กำลังอัปโหลดรูปภาพ', `${i + 1} จาก ${newFiles.length} ไฟล์`);
+      const up = await uploadFile(newFiles[i], folderId, folderName);
+      folderId = up.folderId;
+      photos.push(up.url);
     }
     showBusy('กำลังบันทึกข้อมูลทริป', 'อย่าเพิ่งปิดหน้านี้');
 
@@ -666,6 +710,7 @@ form.addEventListener('submit', async e => {
       lng,
       rating,
       visited: dates.join(','),
+      folder_id: folderId,
       description: f.description.value.trim(),
       photos,
     };
