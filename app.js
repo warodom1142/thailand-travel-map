@@ -90,20 +90,31 @@ const isOpen = id => $(id).classList.contains('open');
 const lb = $('lightbox');
 const lbTrack = $('lb-track');
 
-function openLightbox(urls, start = 0) {
-  if (!urls.length) return;
-  lbTrack.innerHTML = urls.map(u => `<div class="lb-slide"><img src="${esc(u)}" alt=""></div>`).join('');
-  lb.hidden = false;
-  requestAnimationFrame(() => {
-    lbTrack.scrollLeft = start * lbTrack.clientWidth;
-    updateCount();
+const lbState = { urls: [], index: 0, zs: [], pts: new Map(), drag: null, pinch: null, dragX: 0, lastTap: 0 };
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+// วางทุกรูปเรียงกันด้วย transform แล้วคำนวณตำแหน่งตาม index
+function lbApply(animated) {
+  const { index, dragX, zs, urls } = lbState;
+  const w = lb.clientWidth;
+  [...lbTrack.children].forEach((slide, i) => {
+    slide.style.transition = animated ? 'transform .3s cubic-bezier(.2,.8,.2,1)' : 'none';
+    slide.style.transform = `translate3d(${(i - index) * w + dragX}px,0,0)`;
+    const z = zs[i];
+    const img = slide.firstChild;
+    img.style.transition = animated ? 'transform .25s ease' : 'none';
+    img.style.transform = `translate(${z.x}px,${z.y}px) scale(${z.s})`;
   });
+  $('lb-count').textContent = urls.length > 1 ? `${index + 1} / ${urls.length}` : '';
 }
 
-function updateCount() {
-  const total = lbTrack.children.length;
-  const i = Math.round(lbTrack.scrollLeft / lbTrack.clientWidth);
-  $('lb-count').textContent = total > 1 ? `${i + 1} / ${total}` : '';
+function openLightbox(urls, start = 0) {
+  if (!urls.length) return;
+  Object.assign(lbState, { urls, index: start, zs: urls.map(() => ({ s: 1, x: 0, y: 0 })), dragX: 0, pts: new Map(), drag: null, pinch: null });
+  lbTrack.innerHTML = urls.map(u => `<div class="lb-slide"><img src="${esc(u)}" alt="" draggable="false"></div>`).join('');
+  lb.hidden = false;
+  lbApply(false);
 }
 
 function closeLightbox() {
@@ -111,7 +122,98 @@ function closeLightbox() {
   lbTrack.innerHTML = '';
 }
 
-lbTrack.addEventListener('scroll', updateCount, { passive: true });
+function clampPan(z) {
+  const maxX = (z.s - 1) * lb.clientWidth / 2;
+  const maxY = (z.s - 1) * lb.clientHeight / 2;
+  z.x = clamp(z.x, -maxX, maxX);
+  z.y = clamp(z.y, -maxY, maxY);
+}
+
+function goTo(i) {
+  lbState.index = clamp(i, 0, lbState.urls.length - 1);
+  lbState.dragX = 0;
+  lbApply(true);
+}
+
+function toggleZoom() {
+  const z = lbState.zs[lbState.index];
+  z.s = z.s > 1 ? 1 : 2.5;
+  z.x = 0;
+  z.y = 0;
+  lbApply(true);
+}
+
+lb.addEventListener('pointerdown', e => {
+  if (e.target.closest('.lb-close')) return;
+  lbState.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const z = lbState.zs[lbState.index];
+  if (lbState.pts.size === 1) {
+    const now = Date.now();
+    if (now - lbState.lastTap < 300) {
+      lbState.lastTap = 0;
+      lbState.drag = null;
+      return toggleZoom();
+    }
+    lbState.lastTap = now;
+    lbState.drag = { x: e.clientX, y: e.clientY, zx: z.x, zy: z.y, t: now };
+  } else if (lbState.pts.size === 2) {
+    const [a, b] = [...lbState.pts.values()];
+    lbState.pinch = { d: dist(a, b), s: z.s };
+    lbState.drag = null;
+  }
+});
+
+lb.addEventListener('pointermove', e => {
+  if (!lbState.pts.has(e.pointerId)) return;
+  lbState.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const z = lbState.zs[lbState.index];
+  if (lbState.pts.size === 2 && lbState.pinch) {
+    const [a, b] = [...lbState.pts.values()];
+    z.s = clamp(lbState.pinch.s * dist(a, b) / lbState.pinch.d, 1, 5);
+    clampPan(z);
+    lbApply(false);
+  } else if (lbState.pts.size === 1 && lbState.drag) {
+    const dx = e.clientX - lbState.drag.x;
+    const dy = e.clientY - lbState.drag.y;
+    if (z.s > 1) {
+      z.x = lbState.drag.zx + dx;
+      z.y = lbState.drag.zy + dy;
+      clampPan(z);
+    } else {
+      lbState.dragX = dx;
+    }
+    lbApply(false);
+  }
+});
+
+function endPointer(e) {
+  if (!lbState.pts.has(e.pointerId)) return;
+  const drag = lbState.drag;
+  lbState.pts.delete(e.pointerId);
+  if (lbState.pts.size < 2) lbState.pinch = null;
+  if (lbState.pts.size > 0) return;
+
+  const z = lbState.zs[lbState.index];
+  if (z.s <= 1) {
+    z.s = 1;
+    z.x = 0;
+    z.y = 0;
+  }
+  if (drag && z.s === 1) {
+    const dx = lbState.dragX;
+    const w = lb.clientWidth;
+    const fast = Date.now() - drag.t < 300 && Math.abs(dx) > 40;
+    if (dx < -w * 0.2 || (fast && dx < 0)) goTo(lbState.index + 1);
+    else if (dx > w * 0.2 || (fast && dx > 0)) goTo(lbState.index - 1);
+    else { lbState.dragX = 0; lbApply(true); }
+  } else {
+    lbApply(true);
+  }
+  lbState.drag = null;
+}
+lb.addEventListener('pointerup', endPointer);
+lb.addEventListener('pointercancel', endPointer);
+
 $('lb-close').addEventListener('click', closeLightbox);
 
 // ---------- API ----------
@@ -203,6 +305,18 @@ $('search').addEventListener('input', e => {
 });
 
 // ---------- detail ----------
+// ภาพรวมรูปแบบคอลลาจ: 1 / 2 / 3 / 4+ รูป พร้อมจำนวนรูปทั้งหมด
+function collageHtml(photos, c) {
+  const n = photos.length;
+  if (!n) return `<div class="hero-empty" style="--c:${c.color}">${c.emoji}</div>`;
+  const layout = ['', 'one', 'two', 'three'][n] || 'four';
+  const cells = photos.slice(0, 4).map((u, i) => {
+    const more = i === 3 && n > 4 ? `<span class="more">+${n - 4}</span>` : '';
+    return `<button type="button" class="cell" data-i="${i}"><img src="${esc(u)}" loading="lazy" alt="">${more}</button>`;
+  }).join('');
+  return `<div class="collage ${layout}">${cells}<span class="photo-count">📷 ${n} รูป</span></div>`;
+}
+
 function openDetail(id) {
   const p = places.find(x => x.id === id);
   if (!p) return;
@@ -210,10 +324,7 @@ function openDetail(id) {
   const c = catOf(p.category);
   const days = splitDates(p.visited);
 
-  const hero = p.photos.length
-    ? `<div class="hero">${p.photos.map((u, i) =>
-        `<img src="${esc(u)}" data-i="${i}" loading="lazy" alt="">`).join('')}</div>`
-    : `<div class="hero-empty" style="--c:${c.color}">${c.emoji}</div>`;
+  const hero = collageHtml(p.photos, c);
 
   const meta = [p.province, p.rating ? '⭐'.repeat(p.rating) : ''].filter(Boolean).map(esc).join(' · ');
 
@@ -236,8 +347,8 @@ function openDetail(id) {
 
 $('detail').addEventListener('click', e => {
   const p = places.find(x => x.id === detailId);
-  const img = e.target.closest('.hero img');
-  if (img && p) return openLightbox(p.photos, Number(img.dataset.i));
+  const cell = e.target.closest('.cell');
+  if (cell && p) return openLightbox(p.photos, Number(cell.dataset.i));
 
   const act = e.target.closest('[data-act]')?.dataset.act;
   if (act === 'close') hide('detail');
@@ -471,15 +582,28 @@ $('btn-geo').addEventListener('click', () => {
   );
 });
 
-function setSaving(on, text = 'บันทึก') {
+function setSaving(on) {
   $('btn-save').disabled = on;
-  $('btn-save').textContent = on ? text : 'บันทึก';
+  $('btn-save').textContent = on ? 'กำลังบันทึก' : 'บันทึก';
+}
+
+function showBusy(text, sub = '') {
+  $('busy-text').textContent = text;
+  $('busy-sub').textContent = sub;
+  $('busy').hidden = false;
+}
+
+function hideBusy() {
+  $('busy').hidden = true;
 }
 
 function showFormError(msg) {
   $('form-error').textContent = msg;
+  hideBusy();
   setSaving(false);
 }
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function uploadPhoto(file) {
   const dataUrl = await resizeImage(file);
@@ -525,13 +649,14 @@ form.addEventListener('submit', async e => {
   }
 
   setSaving(true);
+  showBusy('กำลังเตรียมบันทึก…');
   try {
     const photos = [...keptPhotos];
     for (let i = 0; i < newFiles.length; i++) {
-      setSaving(true, `อัปโหลด ${i + 1}/${newFiles.length}`);
+      showBusy('กำลังอัปโหลดรูปภาพ', `${i + 1} จาก ${newFiles.length} รูป`);
       photos.push(await uploadPhoto(newFiles[i]));
     }
-    setSaving(true, 'กำลังบันทึก…');
+    showBusy('กำลังบันทึกข้อมูลทริป', 'อย่าเพิ่งปิดหน้านี้');
 
     const place = {
       name,
@@ -550,6 +675,9 @@ form.addEventListener('submit', async e => {
     } else {
       await api('add', { place }, true);
     }
+    showBusy('บันทึกแล้ว ✓');
+    await sleep(500);
+    hideBusy();
     setSaving(false);
     hide('editor');
     await loadPlaces();

@@ -436,11 +436,56 @@ async function main() {
   check('หน้ารายละเอียดของที่ใหม่ไม่มี Invalid', !/Invalid/i.test(dlist));
 
   // รูปเต็มจอ
-  await app.els.detail.dispatch('click', { target: tgt({ i: '0' }, '.hero img') });
+  await app.els.detail.dispatch('click', { target: tgt({ i: '0' }, '.cell') });
   check('กดรูปแล้วเปิดดูเต็มจอ', app.els.lightbox.hidden === false);
   check('เต็มจอแสดงจำนวนรูป (ซ่อนเมื่อรูปเดียว)', app.html('lb-count') === '' || app.html('lb-count') === '1 / 1');
   app.els['lb-close'].dispatch('click');
   check('ปิดรูปเต็มจอได้', app.els.lightbox.hidden === true);
+
+  // คอลลาจและจำนวนรูปในหน้ารายละเอียด
+  check('หน้ารายละเอียดแสดงจำนวนรูป "📷 1 รูป"', app.html('detail-body').includes('📷 1 รูป'));
+  const col5 = get("collageHtml(['a','b','c','d','e'], {color:'#000', emoji:'x'})");
+  check('คอลลาจ 5 รูปแสดงเพียง 4 ช่องและบอกจำนวนที่เหลือ "+1"', col5.includes('+1') && (col5.match(/class="cell"/g) || []).length === 4 && col5.includes('📷 5 รูป'));
+  check('คอลลาจ 3 รูปใช้เค้าโครงแบบ three', get("collageHtml(['a','b','c'], {color:'#000', emoji:'x'})").includes('collage three'));
+  check('คอลลาจไม่มีรูปแสดงอิโมจิหมวด', get("collageHtml([], {color:'#000', emoji:'🛕'})").includes('🛕'));
+
+  // ซูมรูปเต็มจอ: pinch / double tap / swipe
+  const lbEl = app.els.lightbox;
+  const noTarget = { closest: () => null };
+  get("openLightbox(['a','b'], 0)");
+  get('lbState').lastTap = 0;
+  lbEl.dispatch('pointerdown', { pointerId: 1, clientX: 100, clientY: 100, target: noTarget });
+  lbEl.dispatch('pointerdown', { pointerId: 2, clientX: 200, clientY: 100, target: noTarget });
+  lbEl.dispatch('pointermove', { pointerId: 2, clientX: 300, clientY: 100, target: noTarget });
+  check('pinch ขยายรูปตามระยะนิ้ว', Math.abs(get('lbState').zs[0].s - 2) < 1e-6, String(get('lbState').zs[0].s));
+  lbEl.dispatch('pointerup', { pointerId: 1, target: noTarget });
+  lbEl.dispatch('pointerup', { pointerId: 2, target: noTarget });
+  check('ขยายได้สูงสุด 5 เท่า', (() => { get("openLightbox(['a'], 0)"); const l=get('lbState'); l.pinch=null; l.zs[0].s=1; lbEl.dispatch('pointerdown',{pointerId:7,clientX:0,clientY:0,target:noTarget}); lbEl.dispatch('pointerdown',{pointerId:8,clientX:100,clientY:0,target:noTarget}); lbEl.dispatch('pointermove',{pointerId:8,clientX:5000,clientY:0,target:noTarget}); const v=l.zs[0].s; lbEl.dispatch('pointerup',{pointerId:7,target:noTarget}); lbEl.dispatch('pointerup',{pointerId:8,target:noTarget}); return v===5; })());
+
+  get("openLightbox(['a','b'], 0)");
+  get('lbState').lastTap = 0;
+  lbEl.dispatch('pointerdown', { pointerId: 11, clientX: 50, clientY: 50, target: noTarget });
+  lbEl.dispatch('pointerup', { pointerId: 11, target: noTarget });
+  lbEl.dispatch('pointerdown', { pointerId: 11, clientX: 50, clientY: 50, target: noTarget });
+  check('แตะสองครั้งซูมเข้า 2.5 เท่า', get('lbState').zs[0].s === 2.5, String(get('lbState').zs[0].s));
+  lbEl.dispatch('pointerup', { pointerId: 11, target: noTarget });
+  get('lbState').lastTap = 0;
+  lbEl.dispatch('pointerdown', { pointerId: 12, clientX: 50, clientY: 50, target: noTarget });
+  lbEl.dispatch('pointerup', { pointerId: 12, target: noTarget });
+  lbEl.dispatch('pointerdown', { pointerId: 12, clientX: 50, clientY: 50, target: noTarget });
+  lbEl.dispatch('pointerup', { pointerId: 12, target: noTarget });
+  check('แตะสองครั้งอีกครั้งย่อกลับ 1 เท่า', get('lbState').zs[0].s === 1);
+
+  get("openLightbox(['a','b','c'], 0)");
+  get('lbState').lastTap = 0;
+  lbEl.dispatch('pointerdown', { pointerId: 21, clientX: 300, clientY: 50, target: noTarget });
+  lbEl.dispatch('pointermove', { pointerId: 21, clientX: 100, clientY: 50, target: noTarget });
+  lbEl.dispatch('pointerup', { pointerId: 21, target: noTarget });
+  check('ปัดซ้ายไปรูปถัดไปเมื่อยังไม่ได้ซูม', get('lbState').index === 1, String(get('lbState').index));
+  check('ตัวนับแสดง 2 / 3', app.html('lb-count') === '2 / 3', app.html('lb-count'));
+
+  // ป๊อปอัประหว่างบันทึก: ต้องซ่อนหลังบันทึกเสร็จ
+  check('ป๊อปอัปบันทึกถูกซ่อนหลังทำงานเสร็จ', app.els.busy.hidden === true);
 
   // แก้ไข
   await app.els.detail.dispatch('click', { target: tgt({ act: 'edit' }, '[data-act]') });
