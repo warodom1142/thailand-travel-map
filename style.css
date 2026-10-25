@@ -597,3 +597,24 @@ body.sheet-open .fab { opacity: 0; pointer-events: none; transform: scale(0.8); 
 @media (min-width: 720px) {
   .locate { right: 24px; bottom: 100px; }
 }
+
+/* ---------- เลือกจังหวัด ---------- */
+.select-wrap { position: relative; }
+.select-wrap::after {
+  content: "▾";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+  font-size: 16px;
+}
+select.select {
+  width: 100%;
+  padding-right: 36px;
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 48px;
+  cursor: pointer;
+}
