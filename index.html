@@ -2,80 +2,120 @@
 <html lang="th">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>แผนที่เที่ยวไทย</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="เที่ยวไทย">
+  <meta name="theme-color" content="#ffffff">
+  <title>เที่ยวไทย</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>🇹🇭 แผนที่เที่ยวไทย</h1>
-    <input id="search" type="search" placeholder="ค้นหาชื่อ / จังหวัด / รายละเอียด">
-    <select id="filter-category"><option value="">ทุกหมวด</option></select>
-    <button id="btn-add" class="primary">+ เพิ่มสถานที่</button>
-  </header>
+  <div id="map"></div>
 
-  <div id="status"></div>
+  <div class="topbar">
+    <div class="search">
+      <span>⌕</span>
+      <input id="search" type="search" placeholder="ค้นหาสถานที่หรือจังหวัด" enterkeyhint="search">
+    </div>
+    <div id="chips" class="chips"></div>
+  </div>
 
-  <main>
-    <div id="map"></div>
-    <aside id="panel" hidden></aside>
-  </main>
+  <div id="pick-banner" class="pick-banner" hidden>
+    <span>แตะบนแผนที่เพื่อปักหมุด</span>
+    <button id="btn-pick-cancel" type="button">ยกเลิก</button>
+  </div>
 
-  <dialog id="dlg">
-    <form id="form" autocomplete="off">
-      <h2 id="form-title">เพิ่มสถานที่ใหม่</h2>
+  <button id="btn-add" class="fab" type="button" aria-label="เพิ่มสถานที่">+</button>
+  <div id="status" class="status"></div>
 
-      <label>ชื่อสถานที่ *
-        <input name="name" required>
-      </label>
+  <!-- detail sheet -->
+  <section id="detail" class="sheet" hidden>
+    <div class="grabber"></div>
+    <button class="round-x" data-act="close" type="button" aria-label="ปิด">✕</button>
+    <div class="sheet-inner" id="detail-body"></div>
+  </section>
 
-      <div class="row">
-        <label>หมวด
-          <select name="category" id="form-category"></select>
-        </label>
-        <label>จังหวัด
-          <input name="province" list="provinces">
-          <datalist id="provinces"></datalist>
-        </label>
+  <!-- editor sheet -->
+  <section id="editor" class="sheet" hidden>
+    <div class="grabber"></div>
+    <form id="form" novalidate>
+      <div class="sheet-head">
+        <button type="button" class="ghost" id="btn-cancel">ยกเลิก</button>
+        <h2 id="form-title"></h2>
+        <button type="submit" class="ghost strong" id="btn-save">บันทึก</button>
       </div>
 
-      <div class="row">
-        <label>ละติจูด *
-          <input name="lat" type="number" step="any" required>
-        </label>
-        <label>ลองจิจูด *
-          <input name="lng" type="number" step="any" required>
-        </label>
-      </div>
-      <button type="button" id="btn-geo">📍 ใช้ตำแหน่งปัจจุบัน</button>
+      <div class="sheet-inner form-body">
+        <input type="hidden" name="category">
 
-      <div class="row">
-        <label>ให้คะแนน
-          <select name="rating" id="form-rating"></select>
-        </label>
-        <label>วันที่ไป
-          <input name="visited" type="date">
-        </label>
-      </div>
+        <div class="section">
+          <label class="label" for="f-name">ชื่อสถานที่</label>
+          <input id="f-name" name="name" class="field" placeholder="เช่น ดอยอินทนนท์" autocomplete="off">
+        </div>
 
-      <label>รายละเอียด
-        <textarea name="description" rows="4"></textarea>
-      </label>
+        <div class="section">
+          <span class="label">หมวดหมู่</span>
+          <div id="form-cats" class="cat-grid"></div>
+        </div>
 
-      <label>รูปภาพ
-        <input type="file" id="photos" accept="image/*" multiple>
-      </label>
-      <div id="form-photos" class="thumbs"></div>
+        <div class="section row2">
+          <div>
+            <label class="label" for="f-prov">จังหวัด</label>
+            <select id="f-prov" name="province" class="field"><option value="">เลือกจังหวัด</option></select>
+            <small id="prov-hint" class="hint"></small>
+          </div>
+          <div>
+            <span class="label">คะแนน</span>
+            <div id="form-stars" class="stars"></div>
+          </div>
+        </div>
 
-      <p id="form-error" class="error"></p>
+        <div class="section">
+          <span class="label">วันที่ไป</span>
+          <div class="date-row">
+            <input id="date-from" type="date" class="field" aria-label="วันที่">
+            <input id="date-to" type="date" class="field" aria-label="ถึงวันที่">
+            <button type="button" id="btn-add-date" class="pill">+ เพิ่มวันที่</button>
+          </div>
+          <small class="hint">เลือกวันเดียว หรือใส่ "ถึง" เพื่อเพิ่มทั้งช่วง</small>
+          <div id="date-chips" class="date-chips"></div>
+        </div>
 
-      <div class="actions">
-        <button type="button" id="btn-cancel">ยกเลิก</button>
-        <button type="submit" id="btn-save" class="primary">บันทึก</button>
+        <div class="section">
+          <label class="label" for="f-desc">รายละเอียด</label>
+          <textarea id="f-desc" name="description" class="field" rows="4" placeholder="ร้านไหนอร่อย ที่จอดรถ ฯลฯ"></textarea>
+        </div>
+
+        <div class="section">
+          <span class="label">รูปภาพ</span>
+          <div id="photo-grid" class="photo-grid"></div>
+        </div>
+
+        <details class="section coords">
+          <summary class="label">พิกัด</summary>
+          <div class="row2">
+            <input name="lat" type="number" step="any" class="field" placeholder="ละติจูด">
+            <input name="lng" type="number" step="any" class="field" placeholder="ลองจิจูด">
+          </div>
+          <button type="button" id="btn-geo" class="pill">📍 ใช้ตำแหน่งปัจจุบัน</button>
+        </details>
+
+        <p id="form-error" class="error"></p>
       </div>
     </form>
-  </dialog>
+  </section>
+
+  <!-- lightbox -->
+  <div id="lightbox" class="lightbox" hidden>
+    <button id="lb-close" class="lb-close" type="button" aria-label="ปิด">✕</button>
+    <div id="lb-track" class="lb-track"></div>
+    <div id="lb-count" class="lb-count"></div>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="config.js"></script>

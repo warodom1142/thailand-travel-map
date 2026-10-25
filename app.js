@@ -1,13 +1,13 @@
 const cfg = window.APP_CONFIG;
 
 const CATEGORIES = [
-  { name: 'ธรรมชาติ', color: '#2e7d32' },
-  { name: 'วัด/ศาสนสถาน', color: '#f9a825' },
-  { name: 'ร้านอาหาร/คาเฟ่', color: '#e64a19' },
-  { name: 'ที่พัก', color: '#1565c0' },
-  { name: 'ช้อปปิ้ง/ตลาด', color: '#8e24aa' },
-  { name: 'กิจกรรม', color: '#00897b' },
-  { name: 'อื่นๆ', color: '#546e7a' },
+  { name: 'ธรรมชาติ', emoji: '🌿', color: '#22c55e' },
+  { name: 'วัด/ศาสนสถาน', emoji: '🛕', color: '#f59e0b' },
+  { name: 'ร้านอาหาร/คาเฟ่', emoji: '☕', color: '#f97316' },
+  { name: 'ที่พัก', emoji: '🏨', color: '#3b82f6' },
+  { name: 'ช้อปปิ้ง/ตลาด', emoji: '🛍️', color: '#a855f7' },
+  { name: 'กิจกรรม', emoji: '🎯', color: '#14b8a6' },
+  { name: 'อื่นๆ', emoji: '📍', color: '#64748b' },
 ];
 
 const PROVINCES = [
@@ -23,33 +23,92 @@ const PROVINCES = [
   'อ่างทอง', 'อำนาจเจริญ', 'อุดรธานี', 'อุตรดิตถ์', 'อุทัยธานี', 'อุบลราชธานี',
 ];
 
-const colorOf = name => (CATEGORIES.find(c => c.name === name) || CATEGORIES.at(-1)).color;
+// ---------- helpers ----------
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const catOf = name => CATEGORIES.find(c => c.name === name) || CATEGORIES.at(-1);
+const pad = n => String(n).padStart(2, '0');
+const isoOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const fmtDate = iso => new Date(iso + 'T00:00:00')
+  .toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+const splitDates = v => String(v || '').split(',').map(s => s.trim()).filter(Boolean).sort();
+const tile = (url, kind, i, idx) =>
+  `<div class="tile"><img src="${esc(url)}" data-i="${idx}" alt="">` +
+  `<button type="button" class="tile-x" data-kind="${kind}" data-i="${i}" aria-label="ลบรูป">✕</button></div>`;
 
+// ---------- state ----------
 let places = [];
+let filter = { category: '', query: '' };
 let pickMode = false;
 let editing = null;
 let keptPhotos = [];
 let newFiles = [];
+let previewUrls = [];
+let dates = [];
+let rating = 0;
+let detailId = null;
 
 const form = $('form');
-const dlg = $('dlg');
-const panel = $('panel');
 
 // ---------- map ----------
-const map = L.map('map').setView(cfg.MAP_CENTER, cfg.MAP_ZOOM);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+const map = L.map('map', { zoomControl: false }).setView(cfg.MAP_CENTER, cfg.MAP_ZOOM);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd',
   maxZoom: 19,
-  attribution: '&copy; OpenStreetMap',
+  attribution: '&copy; OpenStreetMap &copy; CARTO',
 }).addTo(map);
+if (matchMedia('(min-width: 720px)').matches) L.control.zoom({ position: 'bottomleft' }).addTo(map);
 const markerLayer = L.layerGroup().addTo(map);
 
-// ---------- API ----------
-function configured() {
-  return cfg.API_URL && !cfg.API_URL.includes('PASTE_');
+// ---------- sheets / lightbox ----------
+function show(id) {
+  const el = $(id);
+  clearTimeout(el._t);
+  el.hidden = false;
+  void el.offsetWidth; // force reflow so the slide-in transition runs
+  el.classList.add('open');
+  document.body.classList.add('sheet-open');
 }
+
+function hide(id) {
+  const el = $(id);
+  el.classList.remove('open');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.hidden = true; }, 320);
+  if (!document.querySelector('.sheet.open')) document.body.classList.remove('sheet-open');
+}
+
+const isOpen = id => $(id).classList.contains('open');
+const lb = $('lightbox');
+const lbTrack = $('lb-track');
+
+function openLightbox(urls, start = 0) {
+  if (!urls.length) return;
+  lbTrack.innerHTML = urls.map(u => `<div class="lb-slide"><img src="${esc(u)}" alt=""></div>`).join('');
+  lb.hidden = false;
+  requestAnimationFrame(() => {
+    lbTrack.scrollLeft = start * lbTrack.clientWidth;
+    updateCount();
+  });
+}
+
+function updateCount() {
+  const total = lbTrack.children.length;
+  const i = Math.round(lbTrack.scrollLeft / lbTrack.clientWidth);
+  $('lb-count').textContent = total > 1 ? `${i + 1} / ${total}` : '';
+}
+
+function closeLightbox() {
+  lb.hidden = true;
+  lbTrack.innerHTML = '';
+}
+
+lbTrack.addEventListener('scroll', updateCount, { passive: true });
+$('lb-close').addEventListener('click', closeLightbox);
+
+// ---------- API ----------
+const configured = () => cfg.API_URL && !cfg.API_URL.includes('PASTE_');
 
 async function api(action, payload = {}, write = false) {
   if (!configured()) throw new Error('ยังไม่ได้ตั้งค่า API_URL ใน config.js');
@@ -66,20 +125,20 @@ async function api(action, payload = {}, write = false) {
 }
 
 async function loadPlaces(fit = false) {
-  setStatus('กำลังโหลดข้อมูล...');
+  setStatus('กำลังโหลด…');
   try {
     const { places: list } = await api('list');
     places = list;
     renderMarkers();
     if (fit && places.length) {
-      map.fitBounds(places.map(p => [p.lat, p.lng]), { maxZoom: 10, padding: [40, 40] });
+      map.fitBounds(places.map(p => [p.lat, p.lng]), { maxZoom: 10, padding: [60, 60] });
     }
   } catch (err) {
     setStatus('โหลดไม่สำเร็จ: ' + err.message, true);
   }
 }
 
-// ---------- rendering ----------
+// ---------- status / filters / markers ----------
 function setStatus(msg, isError = false) {
   const el = $('status');
   el.textContent = msg;
@@ -87,160 +146,291 @@ function setStatus(msg, isError = false) {
 }
 
 function visiblePlaces() {
-  const q = $('search').value.trim().toLowerCase();
-  const cat = $('filter-category').value;
+  const q = filter.query.toLowerCase();
   return places.filter(p =>
-    (!cat || p.category === cat) &&
+    (!filter.category || p.category === filter.category) &&
     (!q || [p.name, p.province, p.description].some(v => String(v || '').toLowerCase().includes(q)))
   );
+}
+
+function renderChips() {
+  const all = [
+    { name: '', label: 'ทั้งหมด', emoji: '✨', color: '#111827' },
+    ...CATEGORIES.map(c => ({ ...c, label: c.name })),
+  ];
+  $('chips').innerHTML = all.map(c =>
+    `<button type="button" class="chip${filter.category === c.name ? ' on' : ''}" data-cat="${esc(c.name)}" style="--c:${c.color}">${c.emoji} ${esc(c.label)}</button>`
+  ).join('');
 }
 
 function renderMarkers() {
   markerLayer.clearLayers();
   const list = visiblePlaces();
   for (const p of list) {
-    const icon = L.divIcon({
-      className: '',
-      html: `<div class="pin" style="background:${colorOf(p.category)}"></div>`,
-      iconSize: [20, 20],
-      iconAnchor: [10, 10],
-    });
-    L.marker([p.lat, p.lng], { icon })
-      .bindTooltip(esc(p.name))
-      .on('click', () => openDetail(p.id))
-      .addTo(markerLayer);
+    const c = catOf(p.category);
+    L.marker([p.lat, p.lng], {
+      icon: L.divIcon({
+        className: 'pin-wrap',
+        html: `<div class="pin" style="--c:${c.color}">${c.emoji}</div>`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+      }),
+      title: p.name,
+    }).on('click', () => openDetail(p.id)).addTo(markerLayer);
   }
-  setStatus(`แสดง ${list.length} จาก ${places.length} สถานที่`);
+  const filtered = filter.category || filter.query;
+  setStatus(`${list.length} สถานที่${filtered ? ` จาก ${places.length}` : ''}`);
 }
 
+$('chips').addEventListener('click', e => {
+  const b = e.target.closest('[data-cat]');
+  if (!b) return;
+  filter.category = b.dataset.cat;
+  renderChips();
+  renderMarkers();
+});
+
+$('search').addEventListener('input', e => {
+  filter.query = e.target.value.trim();
+  renderMarkers();
+});
+
+// ---------- detail ----------
 function openDetail(id) {
   const p = places.find(x => x.id === id);
   if (!p) return;
-  panel.dataset.id = id;
-  panel.innerHTML = `
-    <button class="close" data-act="close" aria-label="ปิด">✕</button>
-    <h2>${esc(p.name)}</h2>
-    <p class="meta">
-      <span class="tag" style="background:${colorOf(p.category)}">${esc(p.category)}</span>
-      ${p.province ? `· ${esc(p.province)}` : ''}
-      ${p.rating ? `· ${'⭐'.repeat(p.rating)}` : ''}
-      ${p.visited ? `· ${esc(p.visited)}` : ''}
-    </p>
-    ${p.photos.length ? `<div class="gallery">${p.photos.map(u =>
-      `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" loading="lazy" alt=""></a>`
-    ).join('')}</div>` : ''}
-    <p class="desc">${esc(p.description) || '<span class="muted">ไม่มีรายละเอียด</span>'}</p>
-    <p><a href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}" target="_blank" rel="noopener">🧭 นำทางด้วย Google Maps</a></p>
-    <div class="actions">
-      <button data-act="edit">แก้ไข</button>
-      <button data-act="delete" class="danger">ลบ</button>
+  detailId = id;
+  const c = catOf(p.category);
+  const days = splitDates(p.visited);
+
+  const hero = p.photos.length
+    ? `<div class="hero">${p.photos.map((u, i) =>
+        `<img src="${esc(u)}" data-i="${i}" loading="lazy" alt="">`).join('')}</div>`
+    : `<div class="hero-empty" style="--c:${c.color}">${c.emoji}</div>`;
+
+  const meta = [p.province, p.rating ? '⭐'.repeat(p.rating) : ''].filter(Boolean).map(esc).join(' · ');
+
+  $('detail-body').innerHTML = `
+    ${hero}
+    <div class="detail-pad">
+      <span class="badge" style="--c:${c.color}">${c.emoji} ${esc(c.name)}</span>
+      <h2>${esc(p.name)}</h2>
+      ${meta ? `<p class="sub">${meta}</p>` : ''}
+      ${days.length ? `<div class="date-chips">${days.map(d =>
+        `<span class="date-chip static">${fmtDate(d)}</span>`).join('')}</div>` : ''}
+      ${p.description ? `<p class="desc">${esc(p.description)}</p>` : ''}
+      <div class="detail-actions">
+        <a class="btn primary" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}" target="_blank" rel="noopener">🧭 นำทาง</a>
+        <button class="btn" type="button" data-act="edit">✏️ แก้ไข</button>
+        <button class="btn" type="button" data-act="delete" aria-label="ลบ">🗑️</button>
+      </div>
     </div>`;
-  panel.hidden = false;
-  map.panTo([p.lat, p.lng]);
+  show('detail');
 }
 
-panel.addEventListener('click', e => {
+$('detail').addEventListener('click', e => {
+  const p = places.find(x => x.id === detailId);
+  const img = e.target.closest('.hero img');
+  if (img && p) return openLightbox(p.photos, Number(img.dataset.i));
+
   const act = e.target.closest('[data-act]')?.dataset.act;
-  const p = places.find(x => x.id === panel.dataset.id);
-  if (act === 'close') panel.hidden = true;
-  if (act === 'edit' && p) openForm(p);
-  if (act === 'delete' && p) deletePlace(p);
+  if (act === 'close') hide('detail');
+  if (act === 'edit' && p) { openEditor(p); hide('detail'); }
+  if (act === 'delete' && p) removePlace(p);
 });
 
-// ---------- add-by-clicking-map ----------
-function togglePick(on = !pickMode) {
+async function removePlace(p) {
+  if (!confirm(`ลบ "${p.name}" ใช่ไหม?`)) return;
+  try {
+    await api('delete', { id: p.id }, true);
+    hide('detail');
+    await loadPlaces();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// ---------- pick on map ----------
+function setPick(on) {
   pickMode = on;
   document.body.classList.toggle('picking', on);
-  $('btn-add').textContent = on ? '✕ ยกเลิก' : '+ เพิ่มสถานที่';
-  if (on) setStatus('คลิกบนแผนที่เพื่อเลือกตำแหน่งสถานที่ (กด Esc เพื่อยกเลิก)');
-  else renderMarkers();
+  $('pick-banner').hidden = !on;
+  $('btn-add').classList.toggle('active', on);
+  $('btn-add').textContent = on ? '×' : '+';
 }
+
+$('btn-add').addEventListener('click', () => {
+  if (pickMode) return setPick(false);
+  hide('detail');
+  setPick(true);
+});
+$('btn-pick-cancel').addEventListener('click', () => setPick(false));
 
 map.on('click', e => {
   if (!pickMode) return;
-  togglePick(false);
-  openForm(null, e.latlng);
+  setPick(false);
+  openEditor(null, e.latlng);
 });
 
-// ---------- form ----------
-function initSelects() {
-  const catOpts = CATEGORIES.map(c => `<option>${esc(c.name)}</option>`).join('');
-  $('filter-category').insertAdjacentHTML('beforeend', catOpts);
-  $('form-category').innerHTML = catOpts;
-  $('provinces').innerHTML = PROVINCES.map(p => `<option value="${esc(p)}">`).join('');
-  $('form-rating').innerHTML = [0, 1, 2, 3, 4, 5]
-    .map(n => `<option value="${n}">${n ? '⭐'.repeat(n) : 'ยังไม่ให้'}</option>`).join('');
+// ---------- editor ----------
+function setCategory(name) {
+  form.elements.category.value = name;
+  const c = catOf(name);
+  $('form-cats').innerHTML = CATEGORIES.map(x =>
+    `<button type="button" class="cat-opt${x.name === name ? ' on' : ''}" data-cat="${esc(x.name)}" style="--c:${x.color}">${x.emoji} ${esc(x.name)}</button>`
+  ).join('');
+  return c;
 }
 
-function openForm(place = null, latlng = null) {
-  editing = place;
-  form.reset();
-  $('form-error').textContent = '';
-  $('form-title').textContent = place ? 'แก้ไขสถานที่' : 'เพิ่มสถานที่ใหม่';
+$('form-cats').addEventListener('click', e => {
+  const b = e.target.closest('[data-cat]');
+  if (b) setCategory(b.dataset.cat);
+});
 
-  const d = place || {
-    name: '',
-    category: CATEGORIES[0].name,
-    province: '',
-    rating: 0,
-    visited: '',
-    description: '',
-    lat: latlng.lat.toFixed(6),
-    lng: latlng.lng.toFixed(6),
-  };
-  for (const k of ['name', 'category', 'province', 'lat', 'lng', 'rating', 'visited', 'description']) {
-    form.elements[k].value = d[k] ?? '';
+function renderStars() {
+  $('form-stars').innerHTML = [1, 2, 3, 4, 5].map(n =>
+    `<button type="button" class="star${n <= rating ? ' on' : ''}" data-n="${n}" aria-label="${n} ดาว">★</button>`
+  ).join('');
+}
+
+$('form-stars').addEventListener('click', e => {
+  const b = e.target.closest('[data-n]');
+  if (!b) return;
+  const n = Number(b.dataset.n);
+  rating = rating === n ? 0 : n;
+  renderStars();
+});
+
+function rangeDays(a, b) {
+  const out = [];
+  const d = new Date(a + 'T00:00:00');
+  const end = new Date(b + 'T00:00:00');
+  for (; d <= end; d.setDate(d.getDate() + 1)) out.push(isoOf(d));
+  return out;
+}
+
+function renderDates() {
+  $('date-chips').innerHTML = dates.length
+    ? dates.map(d =>
+        `<span class="date-chip">${fmtDate(d)}<button type="button" data-d="${d}" aria-label="ลบวันนี้">✕</button></span>`
+      ).join('')
+    : '<span class="hint">ยังไม่ได้เลือกวัน</span>';
+}
+
+$('btn-add-date').addEventListener('click', () => {
+  const from = $('date-from').value;
+  const to = $('date-to').value;
+  if (!from) return;
+  const add = to && to >= from ? rangeDays(from, to) : [from];
+  if (add.length > 60) return alert('เพิ่มได้ไม่เกิน 60 วันต่อครั้ง');
+  dates = [...new Set([...dates, ...add])].sort();
+  $('date-from').value = '';
+  $('date-to').value = '';
+  renderDates();
+});
+
+$('date-chips').addEventListener('click', e => {
+  const b = e.target.closest('[data-d]');
+  if (!b) return;
+  dates = dates.filter(d => d !== b.dataset.d);
+  renderDates();
+});
+
+function renderPhotos() {
+  const newUrls = newFiles.map(f => URL.createObjectURL(f));
+  previewUrls = [...keptPhotos, ...newUrls];
+  $('photo-grid').innerHTML =
+    keptPhotos.map((u, i) => tile(u, 'kept', i, i)).join('') +
+    newUrls.map((u, i) => tile(u, 'new', i, keptPhotos.length + i)).join('') +
+    `<label class="add-tile">+<input type="file" accept="image/*" multiple class="sr-only"></label>`;
+}
+
+$('photo-grid').addEventListener('change', e => {
+  if (e.target.type !== 'file') return;
+  newFiles.push(...e.target.files);
+  e.target.value = '';
+  renderPhotos();
+});
+
+$('photo-grid').addEventListener('click', e => {
+  const x = e.target.closest('.tile-x');
+  if (x) {
+    const i = Number(x.dataset.i);
+    if (x.dataset.kind === 'kept') keptPhotos.splice(i, 1);
+    else newFiles.splice(i, 1);
+    return renderPhotos();
   }
+  const img = e.target.closest('.tile img');
+  if (img) openLightbox(previewUrls, Number(img.dataset.i));
+});
+
+async function detectProvince(ll) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=5&accept-language=th&lat=${ll.lat}&lon=${ll.lng}`;
+    const j = await (await fetch(url)).json();
+    const a = j.address || {};
+    const names = [a.state, a.province, a.county, a.region]
+      .filter(Boolean)
+      .map(s => s.replace(/^จังหวัด\s*/, '').trim());
+    const hit = names
+      .map(n => PROVINCES.find(p => p === n || p.includes(n) || n.includes(p)))
+      .find(Boolean);
+    if (!hit) return;
+    if (!form.elements.province.value) form.elements.province.value = hit;
+    $('prov-hint').textContent = 'ตรวจจากพิกัดให้แล้ว';
+  } catch {
+    // ไม่ได้ตรวจจังหวัดอัตโนมัติ ผู้ใช้เลือกเองได้
+  }
+}
+
+function openEditor(place = null, latlng = null) {
+  editing = place;
+  const f = form.elements;
+  $('form-title').textContent = place ? 'แก้ไขสถานที่' : 'สถานที่ใหม่';
+
+  f.name.value = place?.name || '';
+  f.description.value = place?.description || '';
+  f.lat.value = place ? place.lat : latlng ? latlng.lat.toFixed(6) : '';
+  f.lng.value = place ? place.lng : latlng ? latlng.lng.toFixed(6) : '';
+  f.province.value = place?.province || '';
+  $('prov-hint').textContent = '';
+  setCategory(place?.category || CATEGORIES[0].name);
+
+  rating = place?.rating || 0;
+  renderStars();
+
+  dates = splitDates(place?.visited);
+  renderDates();
+  $('date-from').value = '';
+  $('date-to').value = '';
 
   keptPhotos = place ? [...place.photos] : [];
   newFiles = [];
-  $('photos').value = '';
-  renderThumbs();
-  dlg.showModal();
+  renderPhotos();
+
+  $('form-error').textContent = '';
+  show('editor');
+  if (!place && latlng) detectProvince(latlng);
 }
 
-function renderThumbs() {
-  $('form-photos').innerHTML =
-    keptPhotos.map((u, i) =>
-      `<div class="thumb"><img src="${esc(u)}" alt=""><button type="button" data-kind="kept" data-i="${i}">✕</button></div>`
-    ).join('') +
-    newFiles.map((f, i) =>
-      `<div class="thumb"><img src="${URL.createObjectURL(f)}" alt=""><button type="button" data-kind="new" data-i="${i}">✕</button></div>`
-    ).join('');
-}
-
-$('photos').addEventListener('change', e => {
-  newFiles.push(...e.target.files);
-  e.target.value = '';
-  renderThumbs();
-});
-
-$('form-photos').addEventListener('click', e => {
-  const b = e.target.closest('button');
-  if (!b) return;
-  const i = Number(b.dataset.i);
-  if (b.dataset.kind === 'kept') keptPhotos.splice(i, 1);
-  else newFiles.splice(i, 1);
-  renderThumbs();
-});
+$('btn-cancel').addEventListener('click', () => hide('editor'));
 
 $('btn-geo').addEventListener('click', () => {
-  if (!navigator.geolocation) return alert('เบราว์เซอร์นี้ไม่รองรับตำแหน่งที่ตั้ง');
-  navigator.geolocation.getCurrentPosition(
+  navigator.geolocation?.getCurrentPosition(
     pos => {
-      form.elements.lat.value = pos.coords.latitude.toFixed(6);
-      form.elements.lng.value = pos.coords.longitude.toFixed(6);
+      const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      form.elements.lat.value = ll.lat.toFixed(6);
+      form.elements.lng.value = ll.lng.toFixed(6);
+      detectProvince(ll);
     },
     () => alert('ไม่สามารถเข้าถึงตำแหน่งได้'),
     { enableHighAccuracy: true }
   );
 });
 
-$('btn-cancel').addEventListener('click', () => dlg.close());
-
-function setSaving(on) {
+function setSaving(on, text = 'บันทึก') {
   $('btn-save').disabled = on;
-  $('btn-save').textContent = on ? 'กำลังบันทึก...' : 'บันทึก';
+  $('btn-save').textContent = on ? text : 'บันทึก';
 }
 
 function showFormError(msg) {
@@ -248,44 +438,14 @@ function showFormError(msg) {
   setSaving(false);
 }
 
-form.addEventListener('submit', async e => {
-  e.preventDefault();
-  const f = form.elements;
-  const place = {
-    name: f.name.value.trim(),
-    category: f.category.value,
-    province: f.province.value.trim(),
-    lat: parseFloat(f.lat.value),
-    lng: parseFloat(f.lng.value),
-    rating: Number(f.rating.value),
-    visited: f.visited.value,
-    description: f.description.value.trim(),
-    photos: [...keptPhotos],
-  };
-  if (!place.name) return showFormError('กรุณาใส่ชื่อสถานที่');
-  if (Number.isNaN(place.lat) || Number.isNaN(place.lng)) return showFormError('กรุณาระบุละติจูด/ลองจิจูด');
+async function uploadPhoto(file) {
+  const dataUrl = await resizeImage(file);
+  const data = dataUrl.split(',')[1];
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const { url } = await api('upload', { filename, mimeType: 'image/jpeg', data }, true);
+  return url;
+}
 
-  setSaving(true);
-  try {
-    for (const file of newFiles) {
-      place.photos.push(await uploadPhoto(file));
-    }
-    if (editing) {
-      place.id = editing.id;
-      await api('update', { place }, true);
-    } else {
-      await api('add', { place }, true);
-    }
-    dlg.close();
-    await loadPlaces();
-  } catch (err) {
-    showFormError(err.message);
-  } finally {
-    setSaving(false);
-  }
-});
-
-// ---------- photos ----------
 function resizeImage(file, max = 1600) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -304,37 +464,67 @@ function resizeImage(file, max = 1600) {
   });
 }
 
-async function uploadPhoto(file) {
-  const dataUrl = await resizeImage(file);
-  const data = dataUrl.split(',')[1];
-  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-  const { url } = await api('upload', { filename, mimeType: 'image/jpeg', data }, true);
-  return url;
-}
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = form.elements;
+  const name = f.name.value.trim();
+  const lat = parseFloat(f.lat.value);
+  const lng = parseFloat(f.lng.value);
 
-// ---------- delete ----------
-async function deletePlace(p) {
-  if (!confirm(`ลบ "${p.name}" ใช่ไหม?`)) return;
+  if (!name) return showFormError('กรุณาใส่ชื่อสถานที่');
+  if (Number.isNaN(lat) || Number.isNaN(lng)) {
+    return showFormError('ยังไม่มีพิกัด — แตะบนแผนที่เพื่อปักหมุด หรือเปิดหัวข้อพิกัดแล้วกรอกเอง');
+  }
+
+  setSaving(true);
   try {
-    await api('delete', { id: p.id }, true);
-    panel.hidden = true;
+    const photos = [...keptPhotos];
+    for (let i = 0; i < newFiles.length; i++) {
+      setSaving(true, `อัปโหลด ${i + 1}/${newFiles.length}`);
+      photos.push(await uploadPhoto(newFiles[i]));
+    }
+    setSaving(true, 'กำลังบันทึก…');
+
+    const place = {
+      name,
+      category: f.category.value,
+      province: f.province.value,
+      lat,
+      lng,
+      rating,
+      visited: dates.join(','),
+      description: f.description.value.trim(),
+      photos,
+    };
+    if (editing) {
+      place.id = editing.id;
+      await api('update', { place }, true);
+    } else {
+      await api('add', { place }, true);
+    }
+    setSaving(false);
+    hide('editor');
     await loadPlaces();
   } catch (err) {
-    alert(err.message);
+    showFormError(err.message);
   }
-}
-
-// ---------- wiring ----------
-$('btn-add').addEventListener('click', () => togglePick());
-$('search').addEventListener('input', renderMarkers);
-$('filter-category').addEventListener('change', renderMarkers);
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && pickMode) togglePick(false);
 });
 
-initSelects();
+// ---------- keyboard ----------
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!lb.hidden) closeLightbox();
+  else if (isOpen('editor')) hide('editor');
+  else if (pickMode) setPick(false);
+  else if (isOpen('detail')) hide('detail');
+});
+
+// ---------- init ----------
+$('f-prov').insertAdjacentHTML('beforeend', PROVINCES.map(p => `<option>${esc(p)}</option>`).join(''));
+renderChips();
+
 if (!configured()) {
-  setStatus('⚠️ ยังไม่ได้ตั้งค่า API_URL ใน config.js — ดูขั้นตอนใน README', true);
+  setStatus('⚠️ ยังไม่ได้ตั้งค่า API_URL ใน config.js', true);
 } else {
   loadPlaces(true);
 }
