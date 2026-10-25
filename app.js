@@ -581,24 +581,95 @@ $('photo-grid').addEventListener('click', e => {
   if (img) openLightbox(previewUrls, Number(img.dataset.i));
 });
 
-async function detectProvince(ll) {
+// แสดงจังหวัดที่เลือกอยู่เป็นข้อความ ส่วนรายการเลือกจะซ่อนไว้จนกดเปลี่ยน
+function renderProvince() {
+  const v = form.elements.province.value;
+  $('prov-name').textContent = v || 'ยังไม่ระบุ';
+}
+
+function showPicker(on) {
+  $('prov-picker').hidden = !on;
+}
+
+function provinceFromAddress(a = {}) {
+  const names = [a.state, a.province, a.county, a.region]
+    .filter(Boolean)
+    .map(s => s.replace(/^จังหวัด\s*/, '').trim());
+  return names
+    .map(n => PROVINCES.find(p => p === n || p.includes(n) || n.includes(p)))
+    .find(Boolean);
+}
+
+// ตรวจจังหวัดจากพิกัด
+// force = true จะเขียนทับจังหวัดเดิม (ใช้ตอนผู้ใช้ปักหมุดใหม่หรือค้นหาใหม่)
+// provSeq กันไม่ให้การตรวจเก่า (ที่ตอบกลับช้า) ทับค่าที่ผู้ใช้เลือกเองหรือการตรวจครั้งใหม่
+let provSeq = 0;
+
+async function detectProvince(ll, force = false) {
+  const seq = ++provSeq;
+  $('prov-hint').textContent = 'กำลังตรวจจังหวัด…';
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=5&accept-language=th&lat=${ll.lat}&lon=${ll.lng}`;
     const j = await (await fetch(url)).json();
-    const a = j.address || {};
-    const names = [a.state, a.province, a.county, a.region]
-      .filter(Boolean)
-      .map(s => s.replace(/^จังหวัด\s*/, '').trim());
-    const hit = names
-      .map(n => PROVINCES.find(p => p === n || p.includes(n) || n.includes(p)))
-      .find(Boolean);
-    if (!hit) return;
-    if (!form.elements.province.value) form.elements.province.value = hit;
+    if (seq !== provSeq) return;
+    const hit = provinceFromAddress(j.address);
+    if (!hit) {
+      $('prov-hint').textContent = 'ตรวจจังหวัดจากพิกัดไม่ได้ เลือกเองได้';
+      showPicker(true);
+      return;
+    }
+    if (force || !form.elements.province.value) form.elements.province.value = hit;
     $('prov-hint').textContent = 'ตรวจจากพิกัดให้แล้ว';
+    renderProvince();
+    showPicker(false);
   } catch {
-    // ไม่ได้ตรวจจังหวัดอัตโนมัติ ผู้ใช้เลือกเองได้
+    $('prov-hint').textContent = 'ตรวจจังหวัดไม่สำเร็จ เลือกเองได้';
+    showPicker(true);
   }
 }
+
+// ค้นหาสถานที่หรือที่อยู่ในไทย แล้วใส่พิกัดและจังหวัดให้
+async function searchAddress() {
+  const q = $('f-search').value.trim();
+  const hint = $('addr-hint');
+  if (!q) {
+    hint.textContent = 'พิมพ์ชื่อหรือที่อยู่ก่อนค้นหา';
+    return;
+  }
+  hint.textContent = 'กำลังค้นหา…';
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycode=th&accept-language=th&limit=1&q=${encodeURIComponent(q)}`;
+    const list = await (await fetch(url)).json();
+    const hit = Array.isArray(list) ? list[0] : null;
+    if (!hit) {
+      hint.textContent = 'ไม่พบสถานที่นี้ ลองพิมพ์ชื่ออื่น หรือปักหมุดบนแผนที่';
+      return;
+    }
+    const ll = { lat: Number(hit.lat), lng: Number(hit.lon) };
+    form.elements.lat.value = ll.lat.toFixed(6);
+    form.elements.lng.value = ll.lng.toFixed(6);
+    if (!form.elements.name.value.trim()) form.elements.name.value = q;
+    hint.textContent = 'พบแล้ว กำลังตรวจจังหวัด…';
+    await detectProvince(ll, true);
+    hint.textContent = 'พบสถานที่แล้ว';
+  } catch {
+    hint.textContent = 'ค้นหาไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่';
+  }
+}
+
+$('btn-addr').addEventListener('click', searchAddress);
+$('f-search').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); searchAddress(); }
+});
+$('btn-prov-change').addEventListener('click', () => {
+  showPicker(true);
+});
+$('f-prov').addEventListener('change', () => {
+  provSeq++; // ยกเลิกการตรวจที่ยังค้างอยู่ เพราะผู้ใช้เลือกเองแล้ว
+  renderProvince();
+  $('prov-hint').textContent = 'เลือกเองแล้ว';
+  showPicker(false);
+});
 
 function openEditor(place = null, latlng = null) {
   editing = place;
@@ -611,6 +682,11 @@ function openEditor(place = null, latlng = null) {
   f.lng.value = place ? place.lng : latlng ? latlng.lng.toFixed(6) : '';
   f.province.value = place?.province || '';
   $('prov-hint').textContent = '';
+  $('f-search').value = '';
+  $('addr-hint').textContent = 'พิมพ์ชื่อหรือที่อยู่ แล้วกดค้นหา ระบบจะหาพิกัดและจังหวัดให้';
+  provSeq++;
+  renderProvince();
+  showPicker(!f.province.value);
   setCategory(place?.category || CATEGORIES[0].name);
 
   rating = place?.rating || 0;
@@ -628,7 +704,7 @@ function openEditor(place = null, latlng = null) {
 
   $('form-error').textContent = '';
   show('editor');
-  if (!place && latlng) detectProvince(latlng);
+  if (!place && latlng) detectProvince(latlng, true);
 }
 
 $('btn-cancel').addEventListener('click', () => hide('editor'));
@@ -639,7 +715,7 @@ $('btn-geo').addEventListener('click', () => {
       const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       form.elements.lat.value = ll.lat.toFixed(6);
       form.elements.lng.value = ll.lng.toFixed(6);
-      detectProvince(ll);
+      detectProvince(ll, true);
     },
     () => alert('ไม่สามารถเข้าถึงตำแหน่งได้'),
     { enableHighAccuracy: true }

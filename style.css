@@ -597,3 +597,50 @@ body.sheet-open .fab { opacity: 0; pointer-events: none; transform: scale(0.8); 
 @media (min-width: 720px) {
   .locate { right: 24px; bottom: 100px; }
 }
+
+/* ---------- เลือกจังหวัด ---------- */
+.select-wrap { position: relative; }
+.select-wrap::after {
+  content: "▾";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+  font-size: 16px;
+}
+select.select {
+  width: 100%;
+  padding-right: 36px;
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 48px;
+  cursor: pointer;
+}
+
+/* ---------- จังหวัด (แสดงผลก่อน ซ่อนรายการไว้) ---------- */
+.prov-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--field);
+}
+.prov-now { display: flex; flex-direction: column; min-width: 0; }
+.prov-now .hint { margin-top: 2px; }
+.sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- ค้นหาที่อยู่ ---------- */
+.search-row { display: flex; gap: 8px; }
+.search-row .field { flex: 1; min-width: 0; }
+.search-row .pill { flex: 0 0 auto; }
