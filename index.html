@@ -161,6 +161,16 @@
     <div id="lb-count" class="lb-count"></div>
   </div>
 
+  <!-- popup แจ้งเตือนกลางจอ -->
+  <div id="alert" class="alert" hidden role="alertdialog" aria-modal="true" aria-labelledby="alert-title">
+    <div class="alert-card">
+      <div class="alert-icon" aria-hidden="true">!</div>
+      <p id="alert-title" class="alert-title">แจ้งเตือน</p>
+      <p id="alert-msg" class="alert-msg"></p>
+      <button id="alert-ok" type="button" class="alert-btn">ตกลง</button>
+    </div>
+  </div>
+
   <!-- popup ระหว่างบันทึก -->
   <div id="busy" class="busy" hidden>
     <div class="busy-card">

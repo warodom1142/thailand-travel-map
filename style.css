@@ -712,6 +712,48 @@ select.select {
   white-space: nowrap;
 }
 
+/* ---------- popup แจ้งเตือนกลางจอ ---------- */
+.alert {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.alert[hidden] { display: none !important; }
+.alert-card {
+  width: min(86vw, 340px);
+  padding: 26px 22px 20px;
+  border-radius: 20px;
+  background: #fff;
+  color: var(--ink);
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+  animation: alert-pop .18s ease-out;
+}
+@keyframes alert-pop { from { transform: scale(0.92); opacity: 0; } }
+.alert-icon {
+  width: 46px; height: 46px; margin: 0 auto 10px;
+  border-radius: 50%;
+  background: #fee2e2; color: #dc2626;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; font-weight: 800;
+}
+.alert-title { margin: 0 0 6px; font-size: 17px; font-weight: 700; }
+.alert-msg { margin: 0 0 18px; font-size: 14px; line-height: 1.5; color: var(--muted); white-space: pre-line; }
+.alert-btn {
+  width: 100%; height: 46px;
+  border: 0; border-radius: 14px;
+  background: var(--accent); color: #fff;
+  font: inherit; font-size: 16px; font-weight: 600;
+  cursor: pointer;
+}
+
 /* ---------- หน้าปก ---------- */
 .cover {
   position: fixed;

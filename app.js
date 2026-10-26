@@ -837,10 +837,19 @@ function hideBusy() {
   $('busy').hidden = true;
 }
 
+function showAlert(msg, title = 'แจ้งเตือน') {
+  $('alert-title').textContent = title;
+  $('alert-msg').textContent = msg;
+  $('alert').hidden = false;
+}
+
+$('alert-ok').addEventListener('click', () => { $('alert').hidden = true; });
+
 function showFormError(msg) {
   $('form-error').textContent = msg;
   hideBusy();
   setSaving(false);
+  showAlert(msg, 'บันทึกไม่สำเร็จ');
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1105,6 +1114,8 @@ form.addEventListener('submit', async e => {
 // ---------- keyboard ----------
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
+  const alertBox = $('alert');
+  if (alertBox && alertBox.hidden === false) { alertBox.hidden = true; return; }
   if (!lb.hidden) closeLightbox();
   else if (isOpen('editor')) closeEditor();
   else if (pickMode) setPick(false);
