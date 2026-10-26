@@ -72,6 +72,18 @@
       <div class="sheet-inner form-body">
         <input type="hidden" name="category">
 
+        <div class="section location">
+          <button type="button" id="btn-geo" class="pill wide">📍 ใช้ตำแหน่งของฉัน</button>
+          <label class="label" for="f-gmap">หรือใส่พิกัด</label>
+          <div class="search-row">
+            <input id="f-gmap" class="field" placeholder="เช่น G8V7+RP สวนผึ้ง ราชบุรี" autocomplete="off" autocapitalize="characters">
+            <button type="button" id="btn-paste" class="pill">วาง</button>
+            <button type="button" id="btn-gmap" class="pill">ใช้พิกัด</button>
+          </div>
+          <small id="gmap-hint" class="hint">ใส่ Plus Code แล้วเติมชื่ออำเภอหรือจังหวัดต่อท้าย หรือวางลิงก์ Google Maps หรือพิกัดแบบ 18.79, 98.98</small>
+          <button type="button" id="btn-gmap-show" class="pill gmap-show" hidden>📍 ดูตำแหน่งบนแผนที่</button>
+        </div>
+
         <div class="section">
           <label class="label" for="f-name">ชื่อสถานที่</label>
           <input id="f-name" name="name" class="field" placeholder="เช่น ดอยอินทนนท์" autocomplete="off">
@@ -132,23 +144,12 @@
           <div id="photo-grid" class="photo-grid"></div>
         </div>
 
-        <div class="section">
-          <label class="label" for="f-gmap">พิกัด (ไม่บังคับ)</label>
-          <div class="search-row">
-            <input id="f-gmap" class="field" placeholder="เช่น G8V7+RP สวนผึ้ง ราชบุรี" autocomplete="off" autocapitalize="characters">
-            <button type="button" id="btn-gmap" class="pill">ใช้พิกัด</button>
-          </div>
-          <small id="gmap-hint" class="hint">ใส่ Plus Code จาก Google Maps เช่น G8V7+RP แล้วเติมชื่ออำเภอหรือจังหวัดต่อท้าย เช่น "สวนผึ้ง ราชบุรี" ก็ได้ หรือวางลิงก์ Google Maps หรือพิกัดแบบ 18.79, 98.98 ก็ได้</small>
-          <button type="button" id="btn-gmap-show" class="pill gmap-show" hidden>📍 ดูตำแหน่งบนแผนที่</button>
-        </div>
-
         <details class="section coords">
           <summary class="label">พิกัด</summary>
           <div class="row2">
             <input name="lat" type="number" step="any" class="field" placeholder="ละติจูด">
             <input name="lng" type="number" step="any" class="field" placeholder="ลองจิจูด">
           </div>
-          <button type="button" id="btn-geo" class="pill">📍 ใช้ตำแหน่งปัจจุบัน</button>
         </details>
 
         <p id="form-error" class="error"></p>
