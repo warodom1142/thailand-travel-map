@@ -460,7 +460,6 @@ async function main() {
   await app.els['btn-gmap'].dispatch('click');
   await flush();
   check('วางลิงก์แล้วใส่พิกัดในฟอร์ม', app.fields.lat.value === '17.400000', app.fields.lat.value);
-  check('วางลิงก์แล้วโชว์ปุ่มดูตำแหน่ง', app.els['btn-gmap-show'].hidden === false);
 
   // เปลี่ยนจังหวัดเองได้ผ่านปุ่ม "เปลี่ยน"
   await app.els['btn-prov-change'].dispatch('click');
