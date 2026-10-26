@@ -63,7 +63,7 @@
     @keyframes fill { to { width: var(--w); } }
 
     /* ---- radar + reactor ---- */
-    .core-wrap { position: relative; width: 260px; height: 260px; margin: 22px auto 4px; }
+    .core-wrap { position: relative; width: 260px; height: 260px; margin: 22px auto 4px; pointer-events: none; }
     .radar {
       position: absolute; inset: 0; border-radius: 50%;
       background:
@@ -107,16 +107,15 @@
     @media (min-width: 560px) { .grid { grid-template-columns: 1fr 1fr; } }
     .tile {
       position: relative; display: flex; gap: 14px; align-items: center; overflow: hidden;
-      padding: 16px 16px 16px 18px; color: inherit; text-decoration: none;
+      min-height: 80px; padding: 16px 16px 16px 18px; color: inherit; text-decoration: none;
+      cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none;
       background: var(--panel); border: 1px solid rgba(255, 198, 77, 0.35);
       clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
-      transition: transform .15s, box-shadow .2s, border-color .2s;
+      transition: box-shadow .2s, border-color .2s;
       -webkit-tap-highlight-color: transparent;
     }
     .tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(var(--gold), var(--red)); }
-    .tile::after { content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255, 198, 77, 0.18), transparent); transform: skewX(-20deg); transition: left .6s; }
-    .tile:hover::after, .tile:focus-visible::after { left: 130%; }
-    .tile:active { transform: scale(0.98); }
+    .tile > * { pointer-events: none; }
     .tile:hover, .tile:focus-visible { border-color: var(--gold); box-shadow: 0 0 26px rgba(255, 159, 28, 0.35); outline: none; }
     .num { font-family: Orbitron, sans-serif; font-size: 11px; color: var(--red); min-width: 22px; }
     .icon {
@@ -131,9 +130,7 @@
     .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 24px; border: 1px dashed var(--gold-soft); }
 
     /* ---- ticker ---- */
-    .ticker { margin-top: 26px; overflow: hidden; white-space: nowrap; border-top: 1px solid var(--gold-soft); border-bottom: 1px solid var(--gold-soft); padding: 8px 0; font-family: Orbitron, sans-serif; font-size: 10px; color: var(--muted); letter-spacing: 0.2em; }
-    .ticker span { display: inline-block; padding-left: 100%; animation: scroll 18s linear infinite; }
-    @keyframes scroll { to { transform: translateX(-100%); } }
+    .ticker { pointer-events: none; margin-top: 26px; overflow: hidden; white-space: nowrap; border-top: 1px solid var(--gold-soft); border-bottom: 1px solid var(--gold-soft); padding: 8px 0; font-family: Orbitron, sans-serif; font-size: 10px; color: var(--muted); letter-spacing: 0.2em; }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
   </style>
 </head>
