@@ -284,7 +284,7 @@ body.sheet-open .fab { opacity: 0; pointer-events: none; transform: scale(0.8); 
 /* editor */
 #editor { height: 92vh; height: 92dvh; }
 /* พับฟอร์มลงให้เหลือแค่หัวฟอร์ม เพื่อดูหมุดบนแผนที่ */
-#editor.open.peek { transform: translateY(calc(100% - 150px)); }
+#editor.open.peek { transform: translateY(calc(100% - 150px)); transition: transform .32s cubic-bezier(.2, .8, .2, 1); }
 #editor .grabber {
   height: 5px;
   padding: 12px 40px;
@@ -292,6 +292,7 @@ body.sheet-open .fab { opacity: 0; pointer-events: none; transform: scale(0.8); 
   touch-action: none;
   cursor: grab;
 }
+#editor .sheet-head { touch-action: none; }
 #form { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .sheet-head {
   flex: 0 0 auto;

@@ -836,21 +836,47 @@ async function applyCoords(src) {
 function setPeek(on) {
   $('editor').classList.toggle('peek', on);
 }
-const grabber = document.querySelector('#editor .grabber');
-if (grabber) {
-  let drag = null;
-  grabber.addEventListener('pointerdown', e => {
-    drag = { y: e.clientY, wasPeek: $('editor').classList.contains('peek') };
-    grabber.setPointerCapture(e.pointerId);
-  });
-  grabber.addEventListener('pointerup', e => {
-    if (!drag) return;
-    const dy = e.clientY - drag.y;
-    setPeek(dy > 30 ? true : dy < -30 ? false : !drag.wasPeek);
-    drag = null;
-  });
-  grabber.addEventListener('pointercancel', () => { drag = null; });
+// ลากแถบบนของฟอร์มให้ฟอร์มตามนิ้วแบบลื่นๆ แล้วค่อยกางหรือพับตอนปล่อย
+const editorEl = $('editor');
+let drag = null;
+function peekDistance() {
+  return Math.max(0, editorEl.offsetHeight - 150);
 }
+function onDragStart(e) {
+  if (e.target.closest && e.target.closest('button, input, textarea, select')) return;
+  drag = { id: e.pointerId, y: e.clientY, base: editorEl.classList.contains('peek') ? peekDistance() : 0, moved: false, offset: 0 };
+}
+function onDragMove(e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const dy = e.clientY - drag.y;
+  if (!drag.moved) {
+    if (Math.abs(dy) < 6) return;
+    drag.moved = true;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ไม่เป็นไร */ }
+    editorEl.style.transition = 'none';
+  }
+  drag.offset = Math.min(peekDistance(), Math.max(0, drag.base + dy));
+  editorEl.style.transform = `translateY(${drag.offset}px)`;
+}
+function onDragEnd(e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const wasMoved = drag.moved;
+  const offset = drag.offset;
+  drag = null;
+  if (!wasMoved) return;
+  // เปลี่ยนสถานะก่อน แล้วค่อยปล่อยตำแหน่งชั่วคราว เพื่อให้เลื่อนไปจุดใหม่อย่างนุ่มนวล
+  editorEl.style.transition = '';
+  setPeek(offset > peekDistance() / 2);
+  editorEl.style.transform = '';
+}
+[document.querySelector('#editor .grabber'), document.querySelector('#editor .sheet-head')]
+  .filter(Boolean)
+  .forEach(el => {
+    el.addEventListener('pointerdown', onDragStart);
+    el.addEventListener('pointermove', onDragMove);
+    el.addEventListener('pointerup', onDragEnd);
+    el.addEventListener('pointercancel', onDragEnd);
+  });
 
 // แสดงหมุดชั่วคราวที่พิกัดใหม่ และเลื่อนแผนที่ไปหา
 function showPreview(lat, lng) {
