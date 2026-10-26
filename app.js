@@ -791,6 +791,17 @@ async function applyGmapLink() {
 }
 
 $('btn-gmap').addEventListener('click', applyGmapLink);
+// วางจากคลิปบอร์ดลงช่องพิกัด (ยังไม่ใช้ทันที ให้กด "ใช้พิกัด" อีกที)
+$('btn-paste').addEventListener('click', async () => {
+  try {
+    const t = await navigator.clipboard.readText();
+    $('f-gmap').value = String(t || '').trim();
+    $('gmap-hint').textContent = 'วางแล้ว กด "ใช้พิกัด"';
+  } catch {
+    $('gmap-hint').textContent = 'วางจากคลิปบอร์ดไม่ได้ กดค้างในช่องแล้วเลือก "วาง"';
+    $('f-gmap').focus();
+  }
+});
 $('f-gmap').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); applyGmapLink(); }
 });

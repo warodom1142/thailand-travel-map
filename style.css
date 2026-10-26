@@ -681,6 +681,8 @@ select.select {
 .search-row .field { flex: 1; min-width: 0; }
 .search-row .pill { flex: 0 0 auto; }
 .gmap-show { margin-top: 10px; }
+.pill.wide { width: 100%; }
+.location .label { margin-top: 12px; }
 
 /* ---------- จังหวัด (แสดงผลก่อน ซ่อนรายการไว้) ---------- */
 .prov-box {
