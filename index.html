@@ -132,6 +132,16 @@
           <div id="photo-grid" class="photo-grid"></div>
         </div>
 
+        <div class="section">
+          <label class="label" for="f-gmap">ลิงก์ Google Maps (ไม่บังคับ)</label>
+          <div class="search-row">
+            <input id="f-gmap" class="field" placeholder="วางลิงก์จาก Google Maps" autocomplete="off" inputmode="url">
+            <button type="button" id="btn-gmap" class="pill">ใช้ลิงก์</button>
+          </div>
+          <small id="gmap-hint" class="hint">วางลิงก์ที่มีพิกัด หรือพิกัดแบบ 18.79, 98.98</small>
+          <button type="button" id="btn-gmap-show" class="pill gmap-show" hidden>📍 ดูตำแหน่งบนแผนที่</button>
+        </div>
+
         <details class="section coords">
           <summary class="label">พิกัด</summary>
           <div class="row2">

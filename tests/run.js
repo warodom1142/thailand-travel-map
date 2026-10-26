@@ -444,6 +444,20 @@ async function main() {
   check('แสดงชื่อจังหวัดที่ตรวจได้ โดยไม่ต้องเลือกเอง', app.html('prov-name').includes('เชียงใหม่'));
   check('รายการจังหวัดถูกซ่อนไว้ตอนตรวจได้แล้ว', app.els['prov-picker'].hidden === true);
 
+  // วางลิงก์ Google Maps แล้วได้พิกัด
+  const parsed = (txt) => vm.runInContext(`parseGmapCoords(${JSON.stringify(txt)})`, app.sb);
+  check('อ่านพิกัดจาก @lat,lng ของลิงก์ Google Maps', parsed('https://www.google.com/maps/@18.7883,98.9853,17z')?.lat === 18.7883);
+  check('อ่านพิกัดจาก !3d !4d ของลิงก์สถานที่', parsed('https://www.google.com/maps/place/X/data=!3d13.75!4d100.5')?.lng === 100.5);
+  check('อ่านพิกัดจาก ?q=lat,lng', parsed('https://maps.google.com/?q=14.0,100.6')?.lat === 14);
+  check('อ่านพิกัดที่วางตรงๆ', parsed('18.79, 98.98')?.lng === 98.98);
+  check('ลิงก์ที่ไม่มีพิกัดได้ null', parsed('https://maps.app.goo.gl/abc123') === null);
+  check('พิกัดนอกช่วงถูกปฏิเสธ', parsed('@95.0,200.0') === null);
+  app.els['f-gmap'].value = 'https://www.google.com/maps/@17.4,100.4,15z';
+  await app.els['btn-gmap'].dispatch('click');
+  await flush();
+  check('วางลิงก์แล้วใส่พิกัดในฟอร์ม', app.fields.lat.value === '17.400000', app.fields.lat.value);
+  check('วางลิงก์แล้วโชว์ปุ่มดูตำแหน่ง', app.els['btn-gmap-show'].hidden === false);
+
   // เปลี่ยนจังหวัดเองได้ผ่านปุ่ม "เปลี่ยน"
   await app.els['btn-prov-change'].dispatch('click');
   check('กดเปลี่ยนแล้วเปิดรายการจังหวัด', app.els['prov-picker'].hidden === false);

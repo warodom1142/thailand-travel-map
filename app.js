@@ -668,6 +668,10 @@ function openEditor(place = null, latlng = null) {
   renderPhotos();
 
   $('form-error').textContent = '';
+  $('f-gmap').value = '';
+  $('gmap-hint').textContent = 'วางลิงก์ที่มีพิกัด หรือพิกัดแบบ 18.79, 98.98';
+  $('btn-gmap-show').hidden = true;
+  gmapPoint = null;
   show('editor');
   if (!place && latlng) detectProvince(latlng, true);
 }
@@ -685,6 +689,57 @@ async function closeEditor() {
 }
 
 $('btn-cancel').addEventListener('click', closeEditor);
+
+// อ่านพิกัดจากข้อความที่วางมา (ลิงก์ Google Maps แบบเต็ม หรือพิกัดตรงๆ)
+function parseGmapCoords(text) {
+  const s = String(text || '').trim();
+  const patterns = [
+    /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/, // ลิงก์สถานที่ของ Google Maps
+    /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,      // ...@lat,lng,zoom
+    /[?&](?:q|ll|query|center)=(-?\d+(?:\.\d+)?)(?:,|%2C)(-?\d+(?:\.\d+)?)/i,
+    /(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/,   // วางพิกัดตรงๆ
+  ];
+  for (const re of patterns) {
+    const m = re.exec(s);
+    if (!m) continue;
+    const lat = Number(m[1]), lng = Number(m[2]);
+    if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng };
+  }
+  return null;
+}
+
+let gmapPoint = null;
+
+async function applyGmapLink() {
+  const text = $('f-gmap').value;
+  const hint = $('gmap-hint');
+  const ll = parseGmapCoords(text);
+  if (!ll) {
+    gmapPoint = null;
+    $('btn-gmap-show').hidden = true;
+    hint.textContent = /goo\.gl|maps\.app/.test(text)
+      ? 'ลิงก์สั้นอ่านพิกัดไม่ได้ ให้เปิดลิงก์ในเบราว์เซอร์ แล้วคัดลอก URL เต็มมาวาง'
+      : 'หาพิกัดในลิงก์นี้ไม่เจอ ลองวางลิงก์เต็มจาก Google Maps หรือพิกัดแบบ 18.79, 98.98';
+    return;
+  }
+  gmapPoint = ll;
+  form.elements.lat.value = ll.lat.toFixed(6);
+  form.elements.lng.value = ll.lng.toFixed(6);
+  hint.textContent = `พบพิกัดแล้ว ${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
+  $('btn-gmap-show').hidden = false;
+  await detectProvince(ll, true);
+}
+
+$('btn-gmap').addEventListener('click', applyGmapLink);
+$('f-gmap').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); applyGmapLink(); }
+});
+// ปิดฟอร์มชั่วคราวแล้วพาแผนที่ไปยังตำแหน่งนั้น
+$('btn-gmap-show').addEventListener('click', () => {
+  if (!gmapPoint) return;
+  hide('editor');
+  map.flyTo([gmapPoint.lat, gmapPoint.lng], Math.max(map.getZoom(), 15));
+});
 
 $('btn-geo').addEventListener('click', () => {
   navigator.geolocation?.getCurrentPosition(

@@ -676,6 +676,12 @@ select.select {
   cursor: grab;
 }
 
+/* ---------- ช่องวางลิงก์ Google Maps ---------- */
+.search-row { display: flex; gap: 8px; }
+.search-row .field { flex: 1; min-width: 0; }
+.search-row .pill { flex: 0 0 auto; }
+.gmap-show { margin-top: 10px; }
+
 /* ---------- จังหวัด (แสดงผลก่อน ซ่อนรายการไว้) ---------- */
 .prov-box {
   display: flex;
