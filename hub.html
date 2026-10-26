@@ -34,11 +34,6 @@
       min-height: 100vh;
     }
     /* scanlines ทั่วหน้า */
-    body::after {
-      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 5;
-      background: repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0 1px, transparent 1px 3px);
-      opacity: 0.5;
-    }
     .frame { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; }
     .mono { font-family: Orbitron, sans-serif; letter-spacing: 0.18em; }
 
@@ -90,7 +85,6 @@
       box-shadow: 0 0 26px var(--gold), 0 0 70px rgba(255, 90, 30, 0.45);
       display: flex; align-items: center; justify-content: center;
       font-family: Orbitron, sans-serif; font-weight: 900; font-size: 11px; color: #2a0d05; letter-spacing: 0.1em;
-      animation: pulse 2.4s ease-in-out infinite;
     }
     .ring { position: absolute; inset: 14px; border-radius: 50%; border: 2px dashed rgba(255, 198, 77, 0.5); animation: spin 22s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -456,14 +450,27 @@
         }
       }
 
+      // วาดวนเฉพาะตอนเล่นอยู่ ตอนพักวาดครั้งเดียว ไม่กินเครื่อง
+      var looping = false;
       function loop(now) {
         var dt = Math.min(0.05, (now - last) / 1000);
         last = now;
-        if (game && game.running) update(dt);
-        draw();
+        if (game && game.running) {
+          update(dt);
+          draw();
+          requestAnimationFrame(loop);
+        } else {
+          draw();
+          looping = false;
+        }
+      }
+      function startLoop() {
+        if (looping) return;
+        looping = true;
+        last = performance.now();
         requestAnimationFrame(loop);
       }
-      requestAnimationFrame(loop);
+      draw();
 
       function setTargetFrom(e) {
         var r = stage.getBoundingClientRect();
@@ -485,6 +492,7 @@
         game = newGame();
         over.style.display = 'none';
         startBtn.textContent = 'START';
+        startLoop();
         scoreEl.textContent = '0';
         waveEl.textContent = '1';
         comboEl.textContent = 'x1';

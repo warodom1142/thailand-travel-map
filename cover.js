@@ -52,6 +52,8 @@
   }
   knob.addEventListener('pointerup', release);
   knob.addEventListener('pointercancel', release);
+  // ถ้าปัดไม่ได้ ให้แตะข้อความก็เข้าแผนที่ได้
+  text.addEventListener('click', open);
   knob.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
   });
