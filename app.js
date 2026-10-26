@@ -323,7 +323,14 @@ function renderChips() {
   ).join('');
 }
 
+// สรุปทั้งหมด (ไม่นับตัวกรอง)
+function renderSummary() {
+  const provinces = new Set(places.map(p => p.province).filter(Boolean));
+  $('summary').textContent = `📍 ${places.length} สถานที่ · ${provinces.size} จังหวัด`;
+}
+
 function renderMarkers() {
+  renderSummary();
   markerLayer.clearLayers();
   const list = visiblePlaces();
   for (const p of list) {

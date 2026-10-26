@@ -98,6 +98,24 @@ input, select, textarea { font: inherit; }
 }
 .status.error { background: #dc2626; }
 
+/* ---------- สรุปจำนวนสถานที่/จังหวัด ---------- */
+.summary {
+  position: fixed;
+  left: 14px;
+  bottom: calc(env(safe-area-inset-bottom) + 66px);
+  z-index: 800;
+  padding: 6px 12px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.summary:empty { display: none; }
+
 .fab {
   position: fixed;
   right: 18px;
