@@ -130,26 +130,18 @@
 
     /* ---- ticker ---- */
     .ticker { pointer-events: none; margin-top: 12px; overflow: hidden; white-space: nowrap; border-top: 1px solid var(--gold-soft); border-bottom: 1px solid var(--gold-soft); padding: 8px 0; font-family: Orbitron, sans-serif; font-size: 10px; color: var(--muted); letter-spacing: 0.2em; }
-    /* ---- REPULSOR DRILL (เกมเล็ก) ---- */
-    .game { margin-top: 14px; padding: 10px; background: var(--panel); border: 1px solid var(--gold-soft); clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px); }
+    /* ---- IRON STRIKE (เกมยิงเครื่องบิน) ---- */
+    .game { margin-top: 16px; padding: 10px; background: var(--panel); border: 1px solid var(--gold-soft); clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px); }
     .game-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-family: Orbitron, sans-serif; font-size: 10px; letter-spacing: 0.15em; color: var(--gold); }
-    .game-btn { font-family: Orbitron, sans-serif; font-size: 10px; letter-spacing: 0.15em; padding: 7px 10px; background: linear-gradient(90deg, var(--red), var(--gold-2)); color: #1a0803; border: 0; cursor: pointer; clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
-    .field { position: relative; margin-top: 8px; height: 230px; overflow: hidden; touch-action: manipulation; user-select: none; -webkit-user-select: none;
-      background:
-        radial-gradient(circle at 50% 50%, transparent 0 60px, rgba(255, 198, 77, 0.08) 60px 61px, transparent 61px),
-        repeating-linear-gradient(0deg, rgba(255, 198, 77, 0.06) 0 1px, transparent 1px 22px),
-        repeating-linear-gradient(90deg, rgba(255, 198, 77, 0.06) 0 1px, transparent 1px 22px),
-        rgba(10, 5, 3, 0.7);
-      border: 1px solid rgba(255, 198, 77, 0.2); }
-    .drone { position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; border: 2px solid var(--red); background: rgba(224, 38, 45, 0.22); box-shadow: 0 0 14px rgba(224, 38, 45, 0.6); cursor: crosshair; animation: appear .18s ease-out; }
-    .drone::before, .drone::after { content: ""; position: absolute; background: var(--gold); }
-    .drone::before { left: 50%; top: 6px; bottom: 6px; width: 1px; margin-left: -0.5px; opacity: 0.7; }
-    .drone::after { top: 50%; left: 6px; right: 6px; height: 1px; margin-top: -0.5px; opacity: 0.7; }
-    .drone.hit { border-color: var(--gold); background: rgba(255, 198, 77, 0.6); animation: boom .3s ease-out forwards; pointer-events: none; }
-    @keyframes appear { from { transform: scale(0.3); opacity: 0; } }
-    @keyframes boom { to { transform: scale(2.2); opacity: 0; } }
-    .game-foot { display: flex; justify-content: space-between; margin-top: 8px; font-family: Orbitron, sans-serif; font-size: 9px; letter-spacing: 0.15em; color: var(--muted); }
-    .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: rgba(10, 5, 3, 0.7); font-family: Orbitron, sans-serif; font-size: 12px; letter-spacing: 0.15em; color: var(--gold); text-align: center; }
+    .g-title { font-size: 12px; font-weight: 900; }
+    .game-btn { font-family: Orbitron, sans-serif; font-size: 10px; letter-spacing: 0.15em; padding: 7px 12px; background: linear-gradient(90deg, var(--red), var(--gold-2)); color: #1a0803; border: 0; cursor: pointer; clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+    .stage { position: relative; margin-top: 8px; height: 420px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; border: 1px solid rgba(255, 198, 77, 0.2); background: #070302; }
+    .stage canvas { display: block; width: 100%; height: 100%; }
+    .game-foot { display: flex; justify-content: space-between; margin-top: 8px; font-family: Orbitron, sans-serif; font-size: 9px; letter-spacing: 0.12em; color: var(--muted); }
+    .game-foot b { color: var(--gold); font-weight: 700; }
+    .hint-line { margin: 6px 0 0; font-size: 11px; color: var(--muted); text-align: center; }
+    .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: rgba(7, 3, 2, 0.72); font-family: Orbitron, sans-serif; font-size: 13px; letter-spacing: 0.15em; color: var(--gold); text-align: center; }
+    .overlay small { font-family: "Noto Sans Thai", sans-serif; font-size: 12px; letter-spacing: 0; color: var(--muted); }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
   </style>
 </head>
@@ -180,22 +172,24 @@
 
     <div class="ticker mono"><span id="ticker">ALL SYSTEMS NOMINAL · TRAVEL · ENERGY · CLOCK · BOM ·</span></div>
 
-    <section class="game" aria-label="เกมฝึกยิง">
+    <section class="game" aria-label="เกมยิงเครื่องบิน">
       <div class="game-head">
-        <span>REPULSOR DRILL</span>
-        <span id="g-time">00:30</span>
-        <span id="g-score">SCORE 0</span>
+        <span class="g-title">IRON STRIKE</span>
+        <span>BEST <span id="g-best">0</span></span>
         <button id="g-start" class="game-btn" type="button">START</button>
       </div>
-      <div id="g-field" class="field">
+      <div id="g-stage" class="stage">
+        <canvas id="g-canvas"></canvas>
         <div id="g-over" class="overlay">
-          <span>แตะ START เพื่อเริ่มฝึก</span>
-          <small>แตะเป้าก่อนหายไป — 30 วินาที</small>
+          <span>IRON STRIKE</span>
+          <small>ลากนิ้วเพื่อขยับชุด · ยิงอัตโนมัติ · ชนศัตรูเสียชีวิต 1 ครั้ง</small>
+          <small>แตะ START เพื่อเริ่ม</small>
         </div>
       </div>
       <div class="game-foot">
-        <span>HIT <span id="g-hits">0</span></span>
-        <span>MISS <span id="g-miss">0</span></span>
+        <span>SCORE <b id="g-score">0</b></span>
+        <span>WAVE <b id="g-wave">1</b></span>
+        <span>COMBO <b id="g-combo">x1</b></span>
       </div>
     </section>
   </main>
@@ -203,88 +197,298 @@
   <script src="links.js"></script>
   <script>
     (function () {
-      var field = document.getElementById('g-field');
+      var stage = document.getElementById('g-stage');
+      var canvas = document.getElementById('g-canvas');
+      var ctx = canvas.getContext('2d');
       var over = document.getElementById('g-over');
       var startBtn = document.getElementById('g-start');
+      var bestEl = document.getElementById('g-best');
       var scoreEl = document.getElementById('g-score');
-      var timeEl = document.getElementById('g-time');
-      var hitsEl = document.getElementById('g-hits');
-      var missEl = document.getElementById('g-miss');
-      var ROUND = 30; // วินาที
-      var state = null;
+      var waveEl = document.getElementById('g-wave');
+      var comboEl = document.getElementById('g-combo');
 
-      function setOverlay(title, sub) {
-        over.innerHTML = '';
-        var a = document.createElement('span'); a.textContent = title;
-        var b = document.createElement('small'); b.textContent = sub;
-        over.appendChild(a); over.appendChild(b);
-        over.style.display = 'flex';
+      var BEST_KEY = 'hubIronStrikeBest';
+      var W = 1, H = 1, dpr = 1;
+      var game = null;
+      var best = readBest();
+      var dragging = false;
+      var target = null;
+      var audio = null;
+      var last = performance.now();
+
+      bestEl.textContent = String(best);
+
+      function readBest() { try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch (e) { return 0; } }
+      function writeBest(v) { try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) { /* ไม่เป็นไร */ } }
+
+      function resize() {
+        var r = stage.getBoundingClientRect();
+        W = Math.max(1, r.width); H = Math.max(1, r.height);
+        dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      function beep(freq, dur, type, vol) {
+        try {
+          audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+          var o = audio.createOscillator(), g = audio.createGain();
+          o.type = type || 'square'; o.frequency.value = freq;
+          g.gain.value = vol || 0.04;
+          o.connect(g); g.connect(audio.destination);
+          o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + dur);
+          o.stop(audio.currentTime + dur);
+        } catch (e) { /* ไม่มีเสียงก็เล่นได้ */ }
       }
 
-      function clearTargets() {
-        field.querySelectorAll('.drone').forEach(function (d) { d.remove(); });
+      function newGame() {
+        return {
+          running: true,
+          p: { x: W / 2, y: H - 64, tx: W / 2, ty: H - 64, lives: 3, inv: 0 },
+          bullets: [], enemies: [], parts: [],
+          score: 0, kills: 0, wave: 1, combo: 1, comboT: 0,
+          shake: 0, fireT: 0, spawnT: 0.8, t: 0
+        };
       }
 
-      function spawn() {
-        if (!state || !state.running) return;
-        var d = document.createElement('div');
-        d.className = 'drone';
-        var pad = 30;
-        var w = field.clientWidth - pad * 2, h = field.clientHeight - pad * 2;
-        d.style.left = (pad + Math.random() * Math.max(w, 1)) + 'px';
-        d.style.top = (pad + Math.random() * Math.max(h, 1)) + 'px';
-        field.appendChild(d);
-        var life = Math.max(700, 1300 - state.hits * 25); // ยิ่งยิงโดน เป้ายิ่งอยู่สั้นลง
-        var t = setTimeout(function () {
-          if (d.parentNode && !d.classList.contains('hit')) {
-            d.remove();
-            state.miss++;
-            missEl.textContent = String(state.miss);
+      function burst(x, y, color, n) {
+        for (var i = 0; i < n; i++) {
+          var a = Math.random() * Math.PI * 2, s = 60 + Math.random() * 220;
+          game.parts.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.5 + Math.random() * 0.4, max: 0.9, color: color });
+        }
+      }
+
+      function spawnEnemy() {
+        var g = game, r = Math.random(), type;
+        if (g.wave >= 3 && r > 0.85) type = 'dart';
+        else if (g.wave >= 2 && r > 0.6) type = 'shield';
+        else type = 'drone';
+        var e = { x: 30 + Math.random() * Math.max(1, W - 60), y: -30, vx: 0, vy: 80 + g.wave * 12, hp: 1, r: 18, type: type, t: Math.random() * 6 };
+        if (type === 'shield') { e.hp = 3; e.r = 26; e.vy *= 0.7; }
+        if (type === 'dart') { e.r = 12; e.vy = 220 + g.wave * 10; }
+        g.enemies.push(e);
+      }
+
+      function update(dt) {
+        var g = game, p = g.p;
+        g.t += dt;
+
+        // เคลื่อนที่ตามนิ้ว (ลื่นๆ)
+        if (target) { p.tx = target.x; p.ty = target.y; }
+        p.x += (p.tx - p.x) * Math.min(1, dt * 14);
+        p.y += (p.ty - p.y) * Math.min(1, dt * 14);
+        p.x = Math.max(24, Math.min(W - 24, p.x));
+        p.y = Math.max(H * 0.45, Math.min(H - 36, p.y));
+        p.inv -= dt;
+
+        // ยิงอัตโนมัติ ยิ่งด่านสูงยิ่งยิงถี่
+        g.fireT -= dt;
+        if (g.fireT <= 0) {
+          g.bullets.push({ x: p.x, y: p.y - 22, vy: -640 });
+          g.fireT = Math.max(0.07, 0.16 - g.wave * 0.012);
+        }
+
+        // ศัตรูเกิดเป็นระลอก
+        g.spawnT -= dt;
+        if (g.spawnT <= 0) {
+          spawnEnemy();
+          g.spawnT = Math.max(0.28, 1.05 - g.wave * 0.09) * (0.75 + Math.random() * 0.5);
+        }
+
+        g.bullets.forEach(function (b) { b.y += b.vy * dt; });
+        g.bullets = g.bullets.filter(function (b) { return b.y > -10; });
+
+        g.enemies.forEach(function (e) {
+          e.t += dt;
+          e.y += e.vy * dt;
+          if (e.type === 'dart') e.x += Math.sin(e.t * 5) * 90 * dt;
+        });
+
+        // ยิงโดนศัตรู
+        g.bullets = g.bullets.filter(function (b) {
+          for (var i = 0; i < g.enemies.length; i++) {
+            var e = g.enemies[i];
+            if (Math.abs(b.x - e.x) < e.r && Math.abs(b.y - e.y) < e.r) {
+              e.hp--;
+              burst(b.x, b.y, '#ffc64d', 3);
+              if (e.hp <= 0) {
+                var pts = e.type === 'shield' ? 30 : e.type === 'dart' ? 15 : 10;
+                g.score += pts * g.combo;
+                g.kills++;
+                g.combo = Math.min(8, g.combo + 1);
+                g.comboT = 2.5;
+                g.wave = 1 + Math.floor(g.kills / 12);
+                burst(e.x, e.y, '#e0262d', 18);
+                g.shake = Math.min(10, g.shake + 2);
+                beep(520 + Math.random() * 200, 0.08, 'square', 0.03);
+                g.enemies.splice(i, 1);
+              }
+              return false;
+            }
           }
-        }, life);
-        state.timers.push(t);
+          return true;
+        });
+
+        // ศัตรูชนชุด
+        g.enemies = g.enemies.filter(function (e) {
+          var hit = p.inv <= 0 && Math.hypot(e.x - p.x, e.y - p.y) < e.r + 14;
+          if (hit) {
+            g.p.lives--;
+            p.inv = 1.5;
+            g.shake = 10;
+            burst(p.x, p.y, '#ff9f1c', 26);
+            beep(140, 0.25, 'sawtooth', 0.06);
+            return false;
+          }
+          return e.y < H + 40 && e.y > -60;
+        });
+
+        if (g.p.lives <= 0) return endGame();
+
+        g.comboT -= dt;
+        if (g.comboT <= 0) g.combo = 1;
+
+        g.parts.forEach(function (q) { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.96; q.vy *= 0.96; q.life -= dt; });
+        g.parts = g.parts.filter(function (q) { return q.life > 0; });
+        g.shake *= Math.exp(-dt * 8);
+
+        scoreEl.textContent = String(g.score);
+        waveEl.textContent = String(g.wave);
+        comboEl.textContent = 'x' + g.combo;
       }
 
-      field.addEventListener('pointerdown', function (e) {
-        var d = e.target.closest && e.target.closest('.drone');
-        if (!d || !state || !state.running || d.classList.contains('hit')) return;
-        d.classList.add('hit');
-        state.hits++;
-        state.score += 10;
-        hitsEl.textContent = String(state.hits);
-        scoreEl.textContent = 'SCORE ' + state.score;
-        setTimeout(function () { d.remove(); }, 320);
-      });
-
-      function end() {
-        if (!state) return;
-        state.running = false;
-        clearInterval(state.spawnTimer);
-        clearInterval(state.clock);
-        state.timers.forEach(clearTimeout);
-        clearTargets();
-        setOverlay('ฝึกจบแล้ว · SCORE ' + state.score, 'แตะ START เพื่อเล่นอีกครั้ง');
+      function endGame() {
+        var s = game.score;
+        game.running = false;
+        if (s > best) { best = s; writeBest(best); bestEl.textContent = String(best); }
+        over.innerHTML = '';
+        var a = document.createElement('span'); a.textContent = 'GAME OVER';
+        var b = document.createElement('small'); b.textContent = 'คะแนน ' + s + ' · ด่าน ' + game.wave + ' · ฆ่า ' + game.kills;
+        var c = document.createElement('small'); c.textContent = s >= best && s > 0 ? 'ทำสถิติใหม่!' : 'แตะ START เพื่อเล่นอีกครั้ง';
+        over.appendChild(a); over.appendChild(b); over.appendChild(c);
+        over.style.display = 'flex';
         startBtn.textContent = 'AGAIN';
       }
 
+      function drawSuit(p) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        if (p.inv > 0 && Math.floor(p.inv * 12) % 2 === 0) ctx.globalAlpha = 0.35;
+        ctx.shadowColor = '#ffc64d'; ctx.shadowBlur = 18;
+        // ลำตัวสีทอง หน้ากากแดง
+        ctx.fillStyle = '#ffc64d';
+        ctx.beginPath();
+        ctx.moveTo(0, -26); ctx.lineTo(16, -6); ctx.lineTo(24, 16); ctx.lineTo(8, 10);
+        ctx.lineTo(0, 20); ctx.lineTo(-8, 10); ctx.lineTo(-24, 16); ctx.lineTo(-16, -6);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#e0262d';
+        ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(8, -4); ctx.lineTo(0, 2); ctx.lineTo(-8, -4); ctx.closePath(); ctx.fill();
+        // แสงจากฝ่ามือ (repulsor)
+        ctx.shadowColor = '#37d7ff'; ctx.shadowBlur = 16;
+        ctx.fillStyle = '#e9fbff';
+        ctx.beginPath(); ctx.arc(0, 22, 4 + Math.sin(game.t * 20) * 1.2, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+
+      function draw() {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = '#070302';
+        ctx.fillRect(0, 0, W, H);
+
+        // พื้นตารางเคลื่อนไหวเบาๆ
+        var off = game ? (game.t * 60) % 40 : 0;
+        ctx.strokeStyle = 'rgba(255, 198, 77, 0.08)';
+        ctx.lineWidth = 1;
+        for (var y = off; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+        for (var x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+
+        if (!game) return;
+        ctx.save();
+        if (game.shake > 0.1) ctx.translate((Math.random() - 0.5) * game.shake, (Math.random() - 0.5) * game.shake);
+
+        // กระสุน
+        ctx.shadowColor = '#ffc64d'; ctx.shadowBlur = 10;
+        ctx.strokeStyle = '#ffe08a'; ctx.lineWidth = 3;
+        game.bullets.forEach(function (b) { ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x, b.y + 14); ctx.stroke(); });
+
+        // ศัตรู
+        game.enemies.forEach(function (e) {
+          ctx.save();
+          ctx.translate(e.x, e.y);
+          if (e.type === 'shield') {
+            ctx.shadowColor = '#ff9f1c'; ctx.shadowBlur = 14;
+            ctx.strokeStyle = '#ff9f1c'; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.arc(0, 0, e.r, 0, Math.PI * 2 * (e.hp / 3)); ctx.stroke();
+            ctx.strokeStyle = 'rgba(224,38,45,0.6)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(0, 0, e.r - 7, 0, Math.PI * 2); ctx.stroke();
+          } else if (e.type === 'dart') {
+            ctx.shadowColor = '#e0262d'; ctx.shadowBlur = 14;
+            ctx.fillStyle = '#e0262d';
+            ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(10, -10); ctx.lineTo(0, -4); ctx.lineTo(-10, -10); ctx.closePath(); ctx.fill();
+          } else {
+            ctx.shadowColor = '#e0262d'; ctx.shadowBlur = 12;
+            ctx.strokeStyle = '#e0262d'; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.arc(0, 0, e.r, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = '#ffc64d'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(8, 0); ctx.moveTo(0, -8); ctx.lineTo(0, 8); ctx.stroke();
+          }
+          ctx.restore();
+        });
+
+        if (game.running || game.p.lives > 0) drawSuit(game.p);
+
+        // อนุภาค
+        game.parts.forEach(function (q) {
+          ctx.globalAlpha = Math.max(0, q.life / q.max);
+          ctx.fillStyle = q.color;
+          ctx.shadowColor = q.color; ctx.shadowBlur = 8;
+          ctx.beginPath(); ctx.arc(q.x, q.y, 2.5, 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        ctx.restore();
+
+        // HUD: ชีวิต
+        ctx.shadowBlur = 0;
+        for (var i = 0; i < 3; i++) {
+          ctx.fillStyle = i < game.p.lives ? '#ffc64d' : 'rgba(255,198,77,0.15)';
+          ctx.beginPath(); ctx.arc(18 + i * 18, 20, 6, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      function loop(now) {
+        var dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        if (game && game.running) update(dt);
+        draw();
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+
+      function setTargetFrom(e) {
+        var r = stage.getBoundingClientRect();
+        target = { x: e.clientX - r.left, y: e.clientY - r.top };
+      }
+      stage.addEventListener('pointerdown', function (e) {
+        dragging = true;
+        try { stage.setPointerCapture(e.pointerId); } catch (err) { /* ไม่เป็นไร */ }
+        setTargetFrom(e);
+      });
+      stage.addEventListener('pointermove', function (e) { if (dragging) setTargetFrom(e); });
+      function stopDrag() { dragging = false; target = null; }
+      stage.addEventListener('pointerup', stopDrag);
+      stage.addEventListener('pointercancel', stopDrag);
+
       startBtn.addEventListener('click', function () {
-        if (state && state.running) return;
-        end();
-        clearTargets();
-        state = { running: true, score: 0, hits: 0, miss: 0, left: ROUND, timers: [] };
-        scoreEl.textContent = 'SCORE 0';
-        hitsEl.textContent = '0';
-        missEl.textContent = '0';
-        timeEl.textContent = '00:' + String(ROUND).padStart(2, '0');
+        if (game && game.running) return;
+        try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch (e) { /* ไม่มีเสียง */ }
+        game = newGame();
         over.style.display = 'none';
         startBtn.textContent = 'START';
-        state.spawnTimer = setInterval(spawn, 650);
-        state.clock = setInterval(function () {
-          state.left--;
-          timeEl.textContent = '00:' + String(Math.max(state.left, 0)).padStart(2, '0');
-          if (state.left <= 0) end();
-        }, 1000);
-        spawn();
+        scoreEl.textContent = '0';
+        waveEl.textContent = '1';
+        comboEl.textContent = 'x1';
       });
     })();
   </script>
