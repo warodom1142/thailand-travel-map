@@ -126,7 +126,7 @@ function show(id) {
 }
 
 function hide(id) {
-  if (id === 'editor') previewLayer.clearLayers();
+  if (id === 'editor') { previewLayer.clearLayers(); setPeek(false); }
   const el = $(id);
   el.classList.remove('open');
   clearTimeout(el._t);
@@ -669,6 +669,7 @@ $('f-prov').addEventListener('change', () => {
 
 function openEditor(place = null, latlng = null) {
   editing = place;
+  setPeek(false);
   const f = form.elements;
   $('form-title').textContent = place ? 'แก้ไขสถานที่' : 'สถานที่ใหม่';
 
@@ -827,6 +828,28 @@ async function applyCoords(src) {
     setPick(false);
     openEditor(null, { lat: ll.lat, lng: ll.lng });
   }
+  // พับฟอร์มลงเพื่อให้เห็นหมุดบนแผนที่
+  if (isOpen('editor')) setPeek(true);
+}
+
+// พับ/กางฟอร์ม: ปัดแถบด้านบนลงเพื่อดูแผนที่ ปัดขึ้นเพื่อกลับมาเต็มจอ
+function setPeek(on) {
+  $('editor').classList.toggle('peek', on);
+}
+const grabber = document.querySelector('#editor .grabber');
+if (grabber) {
+  let drag = null;
+  grabber.addEventListener('pointerdown', e => {
+    drag = { y: e.clientY, wasPeek: $('editor').classList.contains('peek') };
+    grabber.setPointerCapture(e.pointerId);
+  });
+  grabber.addEventListener('pointerup', e => {
+    if (!drag) return;
+    const dy = e.clientY - drag.y;
+    setPeek(dy > 30 ? true : dy < -30 ? false : !drag.wasPeek);
+    drag = null;
+  });
+  grabber.addEventListener('pointercancel', () => { drag = null; });
 }
 
 // แสดงหมุดชั่วคราวที่พิกัดใหม่ และเลื่อนแผนที่ไปหา
