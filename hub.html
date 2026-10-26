@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#05090f">
+  <title>HUB</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #05090f;
+      --panel: rgba(10, 22, 36, 0.72);
+      --cyan: #37d7ff;
+      --cyan-soft: rgba(55, 215, 255, 0.18);
+      --gold: #ffb84d;
+      --text: #dff6ff;
+      --muted: #7fa6bd;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
+    body {
+      font-family: "Noto Sans Thai", system-ui, sans-serif;
+      padding: max(20px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+      background:
+        radial-gradient(ellipse at 50% -10%, rgba(55, 215, 255, 0.22), transparent 60%),
+        linear-gradient(rgba(55, 215, 255, 0.07) 1px, transparent 1px) 0 0 / 28px 28px,
+        linear-gradient(90deg, rgba(55, 215, 255, 0.07) 1px, transparent 1px) 0 0 / 28px 28px,
+        var(--bg);
+      overflow-x: hidden;
+    }
+    .frame { max-width: 720px; margin: 0 auto; }
+
+    /* ---- header / clock ---- */
+    .top { display: flex; justify-content: space-between; align-items: center; font-family: Orbitron, sans-serif; font-size: 11px; letter-spacing: 0.2em; color: var(--muted); }
+    .top .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #3cff9a; box-shadow: 0 0 10px #3cff9a; margin-right: 8px; vertical-align: middle; }
+
+    /* ---- reactor ---- */
+    .reactor { position: relative; width: 210px; height: 210px; margin: 26px auto 8px; }
+    .ring { position: absolute; inset: 0; border-radius: 50%; border: 1px solid var(--cyan-soft); }
+    .ring.r1 { border: 2px dashed rgba(55, 215, 255, 0.45); animation: spin 18s linear infinite; }
+    .ring.r2 { inset: 22px; border: 3px solid transparent; border-top-color: var(--cyan); border-bottom-color: var(--cyan); animation: spin 6s linear infinite reverse; box-shadow: 0 0 18px rgba(55, 215, 255, 0.35); }
+    .ring.r3 { inset: 50px; border: 1px dotted rgba(255, 184, 77, 0.6); animation: spin 10s linear infinite; }
+    .core {
+      position: absolute; inset: 72px; border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, #e9fbff, var(--cyan) 45%, #0b5f80 100%);
+      box-shadow: 0 0 30px var(--cyan), 0 0 80px rgba(55, 215, 255, 0.5);
+      animation: pulse 2.4s ease-in-out infinite;
+      display: flex; align-items: center; justify-content: center;
+      font-family: Orbitron, sans-serif; font-weight: 900; color: #04202d; letter-spacing: 0.08em; font-size: 15px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 50% { box-shadow: 0 0 46px var(--cyan), 0 0 110px rgba(55, 215, 255, 0.6); } }
+
+    h1 { font-family: Orbitron, sans-serif; font-weight: 900; text-align: center; letter-spacing: 0.25em; margin: 6px 0 2px; font-size: 22px; }
+    .sub { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 22px; }
+
+    /* ---- link tiles ---- */
+    .label-row { display: flex; align-items: center; gap: 10px; font-family: Orbitron, sans-serif; font-size: 11px; letter-spacing: 0.2em; color: var(--muted); margin: 8px 0 12px; }
+    .label-row::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--cyan-soft), transparent); }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 560px) { .grid { grid-template-columns: 1fr 1fr; } }
+    .tile {
+      position: relative; display: flex; gap: 14px; align-items: center;
+      padding: 16px 16px 16px 18px; border-radius: 14px;
+      background: var(--panel); border: 1px solid rgba(55, 215, 255, 0.28);
+      box-shadow: inset 0 0 24px rgba(55, 215, 255, 0.05);
+      color: inherit; text-decoration: none; transition: border-color .2s, box-shadow .2s, transform .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tile::before, .tile::after { content: ""; position: absolute; width: 12px; height: 12px; border-color: var(--cyan); border-style: solid; opacity: 0.8; }
+    .tile::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; border-radius: 6px 0 0 0; }
+    .tile::after { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; border-radius: 0 0 6px 0; }
+    .tile:active { transform: scale(0.98); }
+    .tile:hover, .tile:focus-visible { border-color: var(--cyan); box-shadow: 0 0 24px rgba(55, 215, 255, 0.35), inset 0 0 24px rgba(55, 215, 255, 0.1); outline: none; }
+    .icon {
+      flex: 0 0 52px; height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      font-size: 26px; background: rgba(55, 215, 255, 0.1); border: 1px solid rgba(55, 215, 255, 0.35);
+    }
+    .info { min-width: 0; flex: 1; }
+    .tag { font-family: Orbitron, sans-serif; font-size: 10px; letter-spacing: 0.2em; color: var(--gold); }
+    .title { font-weight: 600; font-size: 17px; margin: 2px 0 2px; }
+    .desc { color: var(--muted); font-size: 13px; line-height: 1.4; }
+    .arrow { font-family: Orbitron, sans-serif; color: var(--cyan); font-size: 20px; }
+    .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 24px; border: 1px dashed rgba(55, 215, 255, 0.3); border-radius: 14px; }
+
+    footer { margin-top: 26px; text-align: center; font-family: Orbitron, sans-serif; font-size: 10px; letter-spacing: 0.2em; color: rgba(127, 166, 189, 0.6); }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <div class="top">
+      <span><span class="dot"></span>ONLINE</span>
+      <span id="clock">--:--:--</span>
+    </div>
+
+    <div class="reactor" aria-hidden="true">
+      <div class="ring r1"></div>
+      <div class="ring r2"></div>
+      <div class="ring r3"></div>
+      <div class="core">HUB</div>
+    </div>
+
+    <h1>CONTROL HUB</h1>
+    <p class="sub">เลือกระบบที่ต้องการเปิด</p>
+
+    <div class="label-row">SYSTEMS</div>
+    <div id="grid" class="grid"></div>
+
+    <footer>TRAVEL · SYSTEMS ONLINE</footer>
+  </main>
+
+  <script src="links.js"></script>
+  <script>
+    (function () {
+      var grid = document.getElementById('grid');
+      var links = Array.isArray(window.HUB_LINKS) ? window.HUB_LINKS : [];
+
+      if (!links.length) {
+        var empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'ยังไม่มีลิงก์ — เพิ่มได้ในไฟล์ links.js';
+        grid.appendChild(empty);
+      }
+
+      links.forEach(function (l) {
+        var a = document.createElement('a');
+        a.className = 'tile';
+        var url = String(l.url || '#');
+        // รับเฉพาะลิงก์ http(s) หรือ path ในเว็บเดียวกัน
+        a.href = /^(https?:\/\/|[\w\-./]+$)/.test(url) ? url : '#';
+        if (/^https?:\/\//.test(url)) { a.target = '_blank'; a.rel = 'noopener'; }
+
+        var icon = document.createElement('div'); icon.className = 'icon'; icon.textContent = l.icon || '◎';
+        var info = document.createElement('div'); info.className = 'info';
+        var tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = l.tag || 'LINK';
+        var title = document.createElement('div'); title.className = 'title'; title.textContent = l.title || 'ไม่มีชื่อ';
+        var desc = document.createElement('div'); desc.className = 'desc'; desc.textContent = l.desc || '';
+        info.appendChild(tag); info.appendChild(title); info.appendChild(desc);
+        var arrow = document.createElement('div'); arrow.className = 'arrow'; arrow.textContent = '▸';
+
+        a.appendChild(icon); a.appendChild(info); a.appendChild(arrow);
+        grid.appendChild(a);
+      });
+
+      var clock = document.getElementById('clock');
+      function tick() {
+        try {
+          clock.textContent = new Date().toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour12: false });
+        } catch (e) { /* ไม่ต้องแสดงเวลาก็ได้ */ }
+      }
+      tick();
+      setInterval(tick, 1000);
+    })();
+  </script>
+</body>
+</html>

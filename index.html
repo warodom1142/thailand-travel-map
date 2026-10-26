@@ -15,6 +15,23 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- หน้าปก: เลื่อนเพื่อเปิดแผนที่ -->
+  <section id="cover" class="cover">
+    <img class="cover-art" src="assets/cover.svg" alt="">
+    <div class="cover-shade"></div>
+    <div class="cover-title">
+      <p class="cover-kicker">THAILAND ROAD TRIP</p>
+      <h1>เที่ยวไทย</h1>
+      <p class="cover-sub">แผนที่การเดินทางของเรา</p>
+    </div>
+    <div class="unlock">
+      <div id="unlock-track" class="unlock-track">
+        <span id="unlock-text" class="unlock-text">เลื่อนเพื่อเปิดแผนที่</span>
+        <div id="unlock-knob" class="unlock-knob" role="button" tabindex="0" aria-label="เลื่อนเพื่อเปิดแผนที่">›</div>
+      </div>
+    </div>
+  </section>
+
   <div id="map"></div>
 
   <div class="topbar">
@@ -157,5 +174,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
+  <script src="cover.js"></script>
 </body>
 </html>

@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f86cc"/>
+      <stop offset="0.55" stop-color="#bfe2f4"/>
+      <stop offset="1" stop-color="#ffe2b0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff6d6" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#fff6d6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a505c"/>
+      <stop offset="1" stop-color="#2d3139"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="390" height="844" fill="url(#sky)"/>
+  <circle cx="284" cy="330" r="120" fill="url(#glow)"/>
+  <circle cx="284" cy="330" r="44" fill="#fff3c4"/>
+
+  <g fill="#ffffff" opacity="0.85">
+    <ellipse cx="70" cy="170" rx="58" ry="14"/>
+    <ellipse cx="96" cy="160" rx="34" ry="14"/>
+    <ellipse cx="330" cy="235" rx="50" ry="12"/>
+    <ellipse cx="302" cy="226" rx="30" ry="11"/>
+  </g>
+
+  <g fill="none" stroke="#1f3550" stroke-width="2.2" stroke-linecap="round" opacity="0.6">
+    <path d="M236 212 q7 -7 14 0 q7 -7 14 0"/>
+    <path d="M262 196 q5 -5 10 0 q5 -5 10 0"/>
+  </g>
+
+  <path d="M0 430 L60 360 L110 405 L170 320 L230 400 L280 350 L340 415 L390 370 L390 540 L0 540 Z" fill="#8fb3d3"/>
+  <path d="M0 470 L70 410 L130 460 L200 390 L270 455 L330 420 L390 465 L390 580 L0 580 Z" fill="#5f8fb0"/>
+  <path d="M0 520 Q100 470 200 510 T390 500 L390 700 L0 700 Z" fill="#6aa878"/>
+
+  <g fill="#2f5d44">
+    <polygon points="22,520 34,488 46,520"/>
+    <polygon points="38,524 52,486 66,524"/>
+    <polygon points="338,510 352,478 366,510"/>
+    <polygon points="354,516 368,482 382,516"/>
+  </g>
+
+  <path d="M0 580 Q150 540 260 580 T390 570 L390 760 L0 760 Z" fill="#3f7f55"/>
+
+  <path d="M95 844 C150 740 150 640 186 530 L204 530 C170 640 200 740 300 844 Z" fill="url(#road)"/>
+  <path d="M198 830 C180 720 185 640 195 540" fill="none" stroke="#f5efd6" stroke-width="4" stroke-dasharray="22 18" opacity="0.9"/>
+
+  <g>
+    <rect x="186" y="742" width="58" height="20" rx="7" fill="#f43f5e"/>
+    <rect x="198" y="728" width="30" height="18" rx="6" fill="#e11d48"/>
+    <rect x="203" y="731" width="22" height="10" rx="3" fill="#cfe8ff"/>
+    <circle cx="198" cy="764" r="7" fill="#1f2430"/>
+    <circle cx="232" cy="764" r="7" fill="#1f2430"/>
+    <rect x="236" y="748" width="8" height="5" rx="2" fill="#fff3c4"/>
+  </g>
+
+  <rect x="0" y="760" width="390" height="84" fill="#2f6b47" opacity="0.9"/>
+</svg>
