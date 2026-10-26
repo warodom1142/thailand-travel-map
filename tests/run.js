@@ -88,9 +88,14 @@ function loadCodeGs(ss) {
       getId: () => f.id,
       isTrashed: () => f.trashed,
       setTrashed: v => { f.trashed = v; },
+      getFilesByName: n => {
+        const list = f.files.filter(x => x.name === n && !x.trashed);
+        let i = 0;
+        return { hasNext: () => i < list.length, next: () => list[i++] };
+      },
       createFile: blob => {
         const fid = 'FILE' + (++fileSeq);
-        const fo = { id: fid, blob, trashed: false, setTrashed(v) { fo.trashed = v; } };
+        const fo = { id: fid, name: blob.name, blob, trashed: false, setTrashed(v) { fo.trashed = v; } };
         f.files.push(fo);
         fileIndex[fid] = fo;
         return { getId: () => fid, setSharing() {} };
@@ -123,6 +128,12 @@ function loadCodeGs(ss) {
     DriveApp: {
       Access: { ANYONE_WITH_LINK: 'anyone' },
       Permission: { VIEW: 'view' },
+      searchFiles: q => {
+        const m = /title = "([^"]+)"/.exec(q);
+        const list = Object.values(fileIndex).filter(x => x.name === m[1] && !x.trashed);
+        let i = 0;
+        return { hasNext: () => i < list.length, next: () => list[i++] };
+      },
       getFileById: id => {
         const x = fileIndex[id];
         if (!x) throw new Error('File not found: ' + id);
@@ -248,6 +259,25 @@ function loadApp(gas) {
     },
   };
 
+  // XHR จำลองสำหรับการอัปโหลด (มี upload.onprogress และ abort)
+  const hooks = { afterUpload: null };
+  class FakeXHR {
+    constructor() { this.upload = {}; this.aborted = false; }
+    open(method, url) { this.method = method; this.url = url; }
+    setRequestHeader() {}
+    abort() { this.aborted = true; this.onabort && this.onabort(); }
+    send(body) {
+      setTimeout(() => {
+        if (this.aborted) return;
+        this.upload.onprogress && this.upload.onprogress({ lengthComputable: true, loaded: 1, total: 2 });
+        const out = gas.ctx.doPost({ postData: { contents: body } });
+        if (hooks.afterUpload) { const h = hooks.afterUpload; hooks.afterUpload = null; h(); }
+        this.responseText = out.s;
+        this.onload && this.onload();
+      }, 0);
+    }
+  }
+
   const fetchStub = async (url, opts = {}) => {
     const u = String(url);
     if (u.includes('nominatim')) return { json: async () => nominatimReply.v };
@@ -264,6 +294,8 @@ function loadApp(gas) {
   const sandbox = {
     document,
     localStorage: fakeStorage,
+    XMLHttpRequest: FakeXHR,
+    AbortController,
     console,
     Date, Math, Number, String, Promise, JSON, Set, Map, Array, Object, Error, RegExp, Intl,
     setTimeout, clearTimeout,
@@ -298,6 +330,7 @@ function loadApp(gas) {
     nominatimReply,
     failNext,
     fakeStorage,
+    hooks,
     confirmAnswer,
     markers: () => layers[0].markers,
     viewCalls,
@@ -706,6 +739,29 @@ async function main() {
   check('ปิดฟอร์มแล้วรูปค้างถูกย้ายลงถังขยะ', drv.files[leftFileId]?.trashed === true);
   check('ปิดฟอร์มแล้วล้างงานค้าง', app.fakeStorage.getItem('pendingUpload') === null);
   check('ทริปที่ไม่ได้บันทึกไม่เข้าชีท', !listRaw().places.some(p => p.name === 'ทิ้งงาน'));
+
+  // ยกเลิกกลางอัปโหลด: ไฟล์ถูกสร้างไปแล้วแต่ไม่ได้รับ id ต้องถูกลบด้วยชื่อไฟล์
+  {
+    const liveBeforeX = liveFiles();
+    if (!app.cls('body').contains('picking')) await app.els['btn-add'].dispatch('click');
+    app.mapH.click({ latlng: { lat: 17.4, lng: 100.4 } });
+    await app.els['f-prov'].dispatch('change');
+    app.fields.name.value = 'ยกเลิกกลางทาง';
+    app.fields.province.value = 'ลำปาง';
+    await app.els['f-prov'].dispatch('change');
+    app.els['date-from'].value = '2026-12-10';
+    await app.els['date-from'].dispatch('change');
+    vm.runInContext('newFiles = []', app.sb);
+    await app.els['photo-grid'].dispatch('change', { target: { type: 'file', files: [{ name: 'c1.jpg', type: 'image/jpeg', size: 41, lastModified: 9 }], value: '' } });
+    app.hooks.afterUpload = () => vm.runInContext('cancelUpload()', app.sb);
+    await app.els.form.dispatch('submit', {});
+    await flush();
+    check('ยกเลิกกลางอัปโหลด ไม่บันทึกทริป', !listRaw().places.some(p => p.name === 'ยกเลิกกลางทาง'));
+    check('ยกเลิกกลางอัปโหลด ลบรูปที่อัปไปแล้วทั้งหมด', liveFiles() === liveBeforeX, `${liveBeforeX} → ${liveFiles()}`);
+    check('ยกเลิกแล้วล้างงานค้าง', app.fakeStorage.getItem('pendingUpload') === null);
+    check('ยกเลิกแล้วฟอร์มยังเปิดอยู่', app.cls('editor').contains('open'));
+    check('แจ้งผู้ใช้ว่ายกเลิกแล้ว', app.html('form-error').includes('ยกเลิกการอัปโหลดแล้ว'), app.html('form-error'));
+  }
 
   mkTrip._fn();
   await flush();

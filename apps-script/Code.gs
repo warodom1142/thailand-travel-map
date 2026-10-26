@@ -190,6 +190,14 @@ function discardUploads(body) {
   (body.fileIds || []).forEach(id => {
     try { DriveApp.getFileById(id).setTrashed(true); } catch (err) { /* ไฟล์หายไปแล้ว */ }
   });
+  // ไฟล์ที่อัปค้างตอนถูกยกเลิก อาจถูกสร้างไปแล้วโดยที่ไม่ได้รับ id — ค้นหาด้วยชื่อไฟล์ที่สุ่มขึ้นเอง (ไม่ซ้ำกัน)
+  (body.names || []).forEach(name => {
+    if (!/^\d+-[a-z0-9]+\.[a-z0-9]+$/i.test(name)) return; // รับเฉพาะชื่อรูปแบบที่แอปตั้งเท่านั้น
+    try {
+      const it = DriveApp.searchFiles('title = "' + name + '" and trashed = false');
+      while (it.hasNext()) it.next().setTrashed(true);
+    } catch (err) { /* ค้นหาไม่ได้ก็ข้าม */ }
+  });
   if (body.deleteFolder && body.folderId) {
     try { DriveApp.getFolderById(body.folderId).setTrashed(true); } catch (err) { /* โฟลเดอร์หายไปแล้ว */ }
   }

@@ -704,10 +704,21 @@ function setSaving(on) {
   $('btn-save').textContent = on ? 'กำลังบันทึก' : 'บันทึก';
 }
 
-function showBusy(text, sub = '') {
+// progress = null ไม่แสดงแถบความคืบหน้า, ค่า 0–1 แสดงแถบพร้อมเปอร์เซ็นต์
+function showBusy(text, sub = '', cancellable = false, progress = null) {
   $('busy-text').textContent = text;
   $('busy-sub').textContent = sub;
+  $('busy-cancel').hidden = !cancellable;
+  $('busy-progress').hidden = progress === null;
+  if (progress !== null) setBusyProgress(progress);
+  setKnob(0);
   $('busy').hidden = false;
+}
+
+function setBusyProgress(p) {
+  const pct = Math.max(0, Math.min(100, Math.round(p * 100)));
+  $('busy-bar').style.width = pct + '%';
+  $('busy-pct').textContent = pct + '%';
 }
 
 function hideBusy() {
@@ -723,7 +734,7 @@ function showFormError(msg) {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // อัปโหลดรูปหรือวิดีโอเข้าโฟลเดอร์ของทริป คืนค่า url และ folderId ใหม่
-async function uploadFile(file, folderId, folderName) {
+async function uploadFile(file, folderId, folderName, signal, onProgress = () => {}, filename = newFilename(file)) {
   let data;
   let mimeType;
   if (isVideoFile(file)) {
@@ -735,10 +746,27 @@ async function uploadFile(file, folderId, folderName) {
     data = dataUrl.split(',')[1];
     mimeType = 'image/jpeg';
   }
-  const ext = isVideoFile(file) ? (file.name?.split('.').pop() || 'mp4') : 'jpg';
-  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const res = await api('upload', { filename, mimeType, data, folderId, folderName }, true);
+  const res = await postWithProgress('upload', { filename, mimeType, data, folderId, folderName }, onProgress, signal);
   return { url: res.url, folderId: res.folderId, fileId: res.fileId };
+}
+
+// ส่งข้อมูลพร้อมรายงานความคืบหน้า (fetch ทำไม่ได้ จึงใช้ XHR)
+function postWithProgress(action, payload, onProgress, signal) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', cfg.API_URL);
+    xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
+    xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    xhr.onload = () => {
+      let j;
+      try { j = JSON.parse(xhr.responseText); } catch { return reject(new Error('ตอบกลับจากเซิร์ฟเวอร์ไม่ถูกต้อง')); }
+      if (j.ok) { onProgress(1); resolve(j); } else reject(new Error(j.error || 'เกิดข้อผิดพลาด'));
+    };
+    xhr.onerror = () => reject(new Error('อัปโหลดไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่'));
+    xhr.onabort = () => { const e = new Error('ยกเลิกแล้ว'); e.name = 'AbortError'; reject(e); };
+    signal?.addEventListener('abort', () => xhr.abort());
+    xhr.send(JSON.stringify({ action, secret: cfg.SECRET, ...payload }));
+  });
 }
 
 // ---- งานอัปโหลดค้าง: เก็บไว้ในเบราว์เซอร์ เพื่อให้บันทึกต่อได้โดยไม่อัปโหลดซ้ำ ----
@@ -759,9 +787,10 @@ function clearPending() {
 async function discardPending(p) {
   if (!p) return;
   const fileIds = Object.values(p.uploads || {}).map(u => u.fileId).filter(Boolean);
-  if (!fileIds.length && !p.folderCreated) return;
+  const names = p.inflight ? [p.inflight] : [];
+  if (!fileIds.length && !names.length && !p.folderCreated) return;
   try {
-    await api('discard', { fileIds, folderId: p.folderId || '', deleteFolder: !!p.folderCreated }, true);
+    await api('discard', { fileIds, names, folderId: p.folderId || '', deleteFolder: !!p.folderCreated }, true);
   } catch { /* ถ้าลบไม่สำเร็จ ไฟล์จะยังอยู่ใน Drive ให้ลบเองได้ */ }
 }
 
@@ -777,6 +806,56 @@ function releaseAwake() {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && $('btn-save').disabled) keepAwake();
 });
+
+// ---- ยกเลิกการอัปโหลดด้วยการเลื่อนปุ่ม ----
+let upload = { ctl: null, cancelled: false };
+
+class UploadCancelled extends Error {}
+
+function cancelUpload() {
+  upload.cancelled = true;
+  upload.ctl?.abort();
+}
+
+const KNOB_MIN = 4;
+const knob = $('slide-knob');
+const track = $('slide-track');
+const slideMax = () => track.clientWidth - knob.offsetWidth - KNOB_MIN * 2;
+
+function setKnob(x) {
+  knob.style.left = x + 'px';
+}
+
+let slide = null;
+knob.addEventListener('pointerdown', e => {
+  slide = { startX: e.clientX, startLeft: parseFloat(knob.style.left) || KNOB_MIN };
+  knob.setPointerCapture(e.pointerId);
+});
+knob.addEventListener('pointermove', e => {
+  if (!slide) return;
+  const max = slideMax();
+  setKnob(clamp(slide.startLeft + (e.clientX - slide.startX), KNOB_MIN, KNOB_MIN + max));
+});
+function endSlide() {
+  if (!slide) return;
+  const max = slideMax();
+  const x = parseFloat(knob.style.left) || KNOB_MIN;
+  slide = null;
+  if (x >= KNOB_MIN + max * 0.9) {
+    setKnob(KNOB_MIN + max);
+    cancelUpload();
+  } else {
+    setKnob(KNOB_MIN);
+  }
+}
+knob.addEventListener('pointerup', endSlide);
+knob.addEventListener('pointercancel', endSlide);
+
+// ชื่อไฟล์ที่ตั้งเองก่อนอัป ใช้ค้นหาไฟล์กำพร้าเพื่อลบได้แม้การอัปถูกยกเลิกกลางทาง
+function newFilename(file) {
+  const ext = isVideoFile(file) ? (file.name?.split('.').pop() || 'mp4') : 'jpg';
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+}
 
 function readAsBase64(file) {
   return new Promise((resolve, reject) => {
@@ -825,6 +904,7 @@ form.addEventListener('submit', async e => {
   setSaving(true);
   showBusy('กำลังเตรียมบันทึก…');
   await keepAwake();
+  upload = { ctl: null, cancelled: false };
   let work = null;
   try {
     const photos = [...keptPhotos];
@@ -841,18 +921,30 @@ form.addEventListener('submit', async e => {
     if (!work) work = { editingId, folderName, folderId: editing?.folder_id || '', folderCreated: false, uploads: {} };
     savePending(work);
 
-    for (let i = 0; i < newFiles.length; i++) {
+    const total = newFiles.length;
+    for (let i = 0; i < total; i++) {
       const sig = fileSig(newFiles[i]);
       let up = work.uploads[sig];
       if (!up) {
-        showBusy(isVideoFile(newFiles[i]) ? 'กำลังอัปโหลดวิดีโอ' : 'กำลังอัปโหลดรูปภาพ', `${i + 1} จาก ${newFiles.length} ไฟล์`);
+        if (upload.cancelled) throw new UploadCancelled();
+        const onProgress = f => showBusy(
+          isVideoFile(newFiles[i]) ? 'กำลังอัปโหลดวิดีโอ' : 'กำลังอัปโหลดรูปภาพ',
+          `${i + 1} จาก ${total} ไฟล์`, true, (i + f) / total
+        );
+        onProgress(0);
+        upload.ctl = new AbortController();
         const wasEmpty = !work.folderId;
-        const res = await uploadFile(newFiles[i], work.folderId, folderName);
+        const filename = newFilename(newFiles[i]);
+        work.inflight = filename;
+        savePending(work);
+        const res = await uploadFile(newFiles[i], work.folderId, folderName, upload.ctl.signal, onProgress, filename);
         if (wasEmpty) work.folderCreated = true;
         work.folderId = res.folderId;
         up = { url: res.url, fileId: res.fileId };
         work.uploads[sig] = up;
-        savePending(work);
+        work.inflight = null;
+        savePending(work); // บันทึกก่อนเช็กการยกเลิก เพื่อให้ลบไฟล์นี้ได้ด้วย
+        if (upload.cancelled) throw new UploadCancelled();
       }
       photos.push(up.url);
     }
@@ -886,6 +978,11 @@ form.addEventListener('submit', async e => {
     hide('editor');
     await loadPlaces();
   } catch (err) {
+    if (upload.cancelled || err instanceof UploadCancelled || err.name === 'AbortError') {
+      await discardPending(work);
+      clearPending();
+      return showFormError('ยกเลิกการอัปโหลดแล้ว รูปที่อัปไปแล้วถูกลบ');
+    }
     const kept = work && Object.keys(work.uploads).length;
     showFormError(kept ? `${err.message} — รูปที่อัปโหลดแล้วถูกเก็บไว้ กดบันทึกอีกครั้งเพื่อทำต่อ` : err.message);
   } finally {
