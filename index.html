@@ -139,9 +139,18 @@
   <!-- popup ระหว่างบันทึก -->
   <div id="busy" class="busy" hidden>
     <div class="busy-card">
-      <div class="spinner"></div>
       <p id="busy-text">กำลังบันทึก…</p>
       <small id="busy-sub"></small>
+      <div id="busy-progress" class="progress" hidden>
+        <div class="progress-track"><div id="busy-bar" class="progress-bar"></div></div>
+        <small id="busy-pct">0%</small>
+      </div>
+      <div id="busy-cancel" class="slide-cancel" hidden>
+        <div class="slide-track" id="slide-track">
+          <span class="slide-label">เลื่อนเพื่อยกเลิกการอัปโหลด</span>
+          <div class="slide-knob" id="slide-knob" role="slider" aria-label="เลื่อนเพื่อยกเลิก" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">›</div>
+        </div>
+      </div>
     </div>
   </div>
 
