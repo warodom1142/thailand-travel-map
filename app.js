@@ -669,9 +669,7 @@ function openEditor(place = null, latlng = null) {
 
   $('form-error').textContent = '';
   $('f-gmap').value = '';
-  $('gmap-hint').textContent = 'ใส่ Plus Code จาก Google Maps เช่น G8V7+RP แล้วเติมชื่ออำเภอหรือจังหวัดต่อท้าย เช่น "สวนผึ้ง ราชบุรี" ก็ได้ หรือวางลิงก์ Google Maps หรือพิกัดแบบ 18.79, 98.98';
-  $('btn-gmap-show').hidden = true;
-  gmapPoint = null;
+  $('gmap-hint').textContent = 'Plus Code, ลิงก์ Google Maps หรือ 18.79, 98.98';
   show('editor');
   if (!place && latlng) detectProvince(latlng, true);
 }
@@ -768,30 +766,27 @@ async function resolvePlusCode(text) {
   return olcNearest(code, ref);
 }
 
-let gmapPoint = null;
-
 async function applyGmapLink() {
   const text = $('f-gmap').value;
   const hint = $('gmap-hint');
   const ll = parseGmapCoords(text) || await resolvePlusCode(text);
   if (!ll) {
-    gmapPoint = null;
-    $('btn-gmap-show').hidden = true;
     hint.textContent = /goo\.gl|maps\.app/.test(text)
       ? 'ลิงก์สั้นอ่านพิกัดไม่ได้ ให้เปิดลิงก์ในเบราว์เซอร์ แล้วคัดลอก URL เต็มมาวาง'
-      : 'หาพิกัดไม่เจอ ลองใส่ Plus Code เช่น G8V7+RP สวนผึ้ง ราชบุรี หรือวางลิงก์เต็มจาก Google Maps';
+      : 'หาพิกัดไม่เจอ ลองใส่ Plus Code เช่น G8V7+RP สวนผึ้ง หรือวางลิงก์เต็มจาก Google Maps';
     return;
   }
-  gmapPoint = ll;
-  form.elements.lat.value = ll.lat.toFixed(6);
-  form.elements.lng.value = ll.lng.toFixed(6);
-  hint.textContent = `พบพิกัดแล้ว ${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
-  $('btn-gmap-show').hidden = false;
-  await detectProvince(ll, true);
+  // ได้พิกัดแล้ว เปิดฟอร์มเพิ่มสถานที่ที่ตำแหน่งนั้นเลย
+  $('f-gmap').value = '';
+  setPick(false);
+  openEditor(null, { lat: ll.lat, lng: ll.lng });
 }
 
 $('btn-gmap').addEventListener('click', applyGmapLink);
-// วางจากคลิปบอร์ดลงช่องพิกัด (ยังไม่ใช้ทันที ให้กด "ใช้พิกัด" อีกที)
+$('f-gmap').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); applyGmapLink(); }
+});
+// วางจากคลิปบอร์ดลงช่องพิกัด (ยังไม่ใช้ทันที ให้กด "ใช้พิกัด")
 $('btn-paste').addEventListener('click', async () => {
   try {
     const t = await navigator.clipboard.readText();
@@ -801,15 +796,6 @@ $('btn-paste').addEventListener('click', async () => {
     $('gmap-hint').textContent = 'วางจากคลิปบอร์ดไม่ได้ กดค้างในช่องแล้วเลือก "วาง"';
     $('f-gmap').focus();
   }
-});
-$('f-gmap').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); applyGmapLink(); }
-});
-// ปิดฟอร์มชั่วคราวแล้วพาแผนที่ไปยังตำแหน่งนั้น
-$('btn-gmap-show').addEventListener('click', () => {
-  if (!gmapPoint) return;
-  hide('editor');
-  map.flyTo([gmapPoint.lat, gmapPoint.lng], Math.max(map.getZoom(), 15));
 });
 
 $('btn-geo').addEventListener('click', () => {

@@ -123,10 +123,11 @@ body.sheet-open .fab { opacity: 0; pointer-events: none; transform: scale(0.8); 
   top: calc(env(safe-area-inset-top) + 124px);
   z-index: 820;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 7px 7px 7px 16px;
-  border-radius: 99px;
+  flex-direction: column;
+  gap: 8px;
+  width: min(92vw, 460px);
+  padding: 10px 12px;
+  border-radius: 22px;
   background: var(--ink);
   color: #fff;
   font-size: 14px;
@@ -594,6 +595,12 @@ body.sheet-open .fab { opacity: 0; pointer-events: none; transform: scale(0.8); 
   100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
 }
 .pick-banner button#btn-pick-here { background: #2563eb; color: #fff; }
+.pick-row { display: flex; align-items: center; gap: 8px; }
+.pick-row > span { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 4px; }
+.coords-row input { flex: 1; min-width: 0; height: 36px; border-radius: 99px; border: 0; padding: 0 14px; font: inherit; font-size: 14px; color: var(--ink); background: #fff; }
+.coords-row input::placeholder { color: #8a94a6; }
+.coords-row button { flex: 0 0 auto; height: 36px; }
+.pick-hint { color: #b8c0cc; font-size: 11px; padding: 0 4px; }
 @media (min-width: 720px) {
   .locate { right: 24px; bottom: 100px; }
 }

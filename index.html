@@ -43,9 +43,17 @@
   </div>
 
   <div id="pick-banner" class="pick-banner" hidden>
-    <span>แตะบนแผนที่เพื่อปักหมุด</span>
-    <button id="btn-pick-here" type="button">📍 ใช้ตำแหน่งฉัน</button>
-    <button id="btn-pick-cancel" type="button">ยกเลิก</button>
+    <div class="pick-row">
+      <span>แตะบนแผนที่เพื่อปักหมุด</span>
+      <button id="btn-pick-here" type="button">📍 ใช้ตำแหน่งฉัน</button>
+      <button id="btn-pick-cancel" type="button">ยกเลิก</button>
+    </div>
+    <div class="pick-row coords-row">
+      <input id="f-gmap" class="field" placeholder="หรือวางพิกัด เช่น G8V7+RP สวนผึ้ง" autocomplete="off" autocapitalize="characters">
+      <button id="btn-paste" type="button">วาง</button>
+      <button id="btn-gmap" type="button">ใช้พิกัด</button>
+    </div>
+    <small id="gmap-hint" class="pick-hint">Plus Code, ลิงก์ Google Maps หรือ 18.79, 98.98</small>
   </div>
 
   <button id="btn-locate" class="locate" type="button" aria-label="หาตำแหน่งของฉัน">📍</button>
@@ -71,18 +79,6 @@
 
       <div class="sheet-inner form-body">
         <input type="hidden" name="category">
-
-        <div class="section location">
-          <button type="button" id="btn-geo" class="pill wide">📍 ใช้ตำแหน่งของฉัน</button>
-          <label class="label" for="f-gmap">หรือใส่พิกัด</label>
-          <div class="search-row">
-            <input id="f-gmap" class="field" placeholder="เช่น G8V7+RP สวนผึ้ง ราชบุรี" autocomplete="off" autocapitalize="characters">
-            <button type="button" id="btn-paste" class="pill">วาง</button>
-            <button type="button" id="btn-gmap" class="pill">ใช้พิกัด</button>
-          </div>
-          <small id="gmap-hint" class="hint">ใส่ Plus Code แล้วเติมชื่ออำเภอหรือจังหวัดต่อท้าย หรือวางลิงก์ Google Maps หรือพิกัดแบบ 18.79, 98.98</small>
-          <button type="button" id="btn-gmap-show" class="pill gmap-show" hidden>📍 ดูตำแหน่งบนแผนที่</button>
-        </div>
 
         <div class="section">
           <label class="label" for="f-name">ชื่อสถานที่</label>
@@ -146,6 +142,7 @@
 
         <details class="section coords">
           <summary class="label">พิกัด</summary>
+          <button type="button" id="btn-geo" class="pill">📍 ใช้ตำแหน่งปัจจุบัน</button>
           <div class="row2">
             <input name="lat" type="number" step="any" class="field" placeholder="ละติจูด">
             <input name="lng" type="number" step="any" class="field" placeholder="ลองจิจูด">
