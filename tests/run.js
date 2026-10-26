@@ -445,6 +445,11 @@ async function main() {
   check('รายการจังหวัดถูกซ่อนไว้ตอนตรวจได้แล้ว', app.els['prov-picker'].hidden === true);
 
   check('แสดงสรุปจำนวนสถานที่และจังหวัด', /\d+ สถานที่ · \d+ จังหวัด/.test(app.html('summary')), app.html('summary'));
+  // แก้ไขพิกัดได้ตอนอยู่ในฟอร์มแก้ไข (ไม่ต้องปักหมุดใหม่)
+  app.els['ed-gmap'].value = '@17.9,100.9,15z';
+  await app.els['ed-apply'].dispatch('click');
+  await flush();
+  check('ตอนแก้ไขใช้ช่องพิกัดในฟอร์มเปลี่ยนพิกัดได้', app.fields.lat.value === '17.900000' && app.cls('editor').contains('open'), app.fields.lat.value);
   // วางลิงก์ Google Maps แล้วได้พิกัด
   const parsed = (txt) => vm.runInContext(`parseGmapCoords(${JSON.stringify(txt)})`, app.sb);
   check('อ่านพิกัดจาก @lat,lng ของลิงก์ Google Maps', parsed('https://www.google.com/maps/@18.7883,98.9853,17z')?.lat === 18.7883);
