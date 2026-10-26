@@ -350,9 +350,29 @@ $('chips').addEventListener('click', e => {
   renderMarkers();
 });
 
+function syncSearchClear() {
+  $('search-clear').hidden = !$('search').value;
+}
 $('search').addEventListener('input', e => {
   filter.query = e.target.value.trim();
+  syncSearchClear();
   renderMarkers();
+});
+$('search-clear').addEventListener('click', () => {
+  $('search').value = '';
+  filter.query = '';
+  syncSearchClear();
+  renderMarkers();
+});
+
+function syncGmapClear() {
+  $('gmap-clear').hidden = !$('f-gmap').value;
+}
+$('f-gmap').addEventListener('input', syncGmapClear);
+$('gmap-clear').addEventListener('click', () => {
+  $('f-gmap').value = '';
+  syncGmapClear();
+  $('gmap-hint').textContent = 'Plus Code, ลิงก์ Google Maps หรือ 18.79, 98.98';
 });
 
 // ---------- detail ----------
@@ -778,6 +798,7 @@ async function applyGmapLink() {
   }
   // ได้พิกัดแล้ว เปิดฟอร์มเพิ่มสถานที่ที่ตำแหน่งนั้นเลย
   $('f-gmap').value = '';
+  syncGmapClear();
   setPick(false);
   openEditor(null, { lat: ll.lat, lng: ll.lng });
 }
@@ -791,6 +812,7 @@ $('btn-paste').addEventListener('click', async () => {
   try {
     const t = await navigator.clipboard.readText();
     $('f-gmap').value = String(t || '').trim();
+    syncGmapClear();
     $('gmap-hint').textContent = 'วางแล้ว กด "ใช้พิกัด"';
   } catch {
     $('gmap-hint').textContent = 'วางจากคลิปบอร์ดไม่ได้ กดค้างในช่องแล้วเลือก "วาง"';
