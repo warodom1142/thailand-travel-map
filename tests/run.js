@@ -444,6 +444,7 @@ async function main() {
   check('แสดงชื่อจังหวัดที่ตรวจได้ โดยไม่ต้องเลือกเอง', app.html('prov-name').includes('เชียงใหม่'));
   check('รายการจังหวัดถูกซ่อนไว้ตอนตรวจได้แล้ว', app.els['prov-picker'].hidden === true);
 
+  check('แสดงสรุปจำนวนสถานที่และจังหวัด', /\d+ สถานที่ · \d+ จังหวัด/.test(app.html('summary')), app.html('summary'));
   // วางลิงก์ Google Maps แล้วได้พิกัด
   const parsed = (txt) => vm.runInContext(`parseGmapCoords(${JSON.stringify(txt)})`, app.sb);
   check('อ่านพิกัดจาก @lat,lng ของลิงก์ Google Maps', parsed('https://www.google.com/maps/@18.7883,98.9853,17z')?.lat === 18.7883);
