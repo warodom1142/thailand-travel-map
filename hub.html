@@ -24,7 +24,7 @@
     html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
     body {
       font-family: "Noto Sans Thai", system-ui, sans-serif;
-      padding: max(18px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+      padding: max(12px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom));
       overflow-x: hidden;
       background:
         radial-gradient(ellipse 60% 40% at 50% 0%, rgba(255, 159, 28, 0.25), transparent 70%),
@@ -51,19 +51,19 @@
     #clock { color: var(--gold); font-size: 12px; }
 
     /* ---- gauges ---- */
-    .gauges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0 4px; }
+    .gauges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0 0; }
     .gauge {
-      padding: 10px 10px 12px; background: var(--panel);
+      padding: 7px 8px 9px; background: var(--panel);
       border: 1px solid var(--gold-soft); clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
     }
     .gauge .k { font-size: 9px; color: var(--muted); }
-    .gauge .v { font-family: Orbitron, sans-serif; font-size: 18px; color: var(--gold); margin: 2px 0 6px; }
+    .gauge .v { font-family: Orbitron, sans-serif; font-size: 15px; color: var(--gold); margin: 1px 0 4px; }
     .bar { height: 4px; background: rgba(255, 198, 77, 0.12); overflow: hidden; }
     .bar span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--red), var(--gold)); animation: fill 1.4s ease-out forwards; }
     @keyframes fill { to { width: var(--w); } }
 
     /* ---- radar + reactor ---- */
-    .core-wrap { position: relative; width: 260px; height: 260px; margin: 22px auto 4px; pointer-events: none; }
+    .core-wrap { position: relative; width: 168px; height: 168px; margin: 10px auto 0; pointer-events: none; }
     .radar {
       position: absolute; inset: 0; border-radius: 50%;
       background:
@@ -86,28 +86,27 @@
     }
     @keyframes ping { 0% { transform: scale(1); opacity: 1; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
     .core {
-      position: absolute; left: 50%; top: 50%; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 50%;
+      position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%;
       background: radial-gradient(circle at 40% 35%, #fff4c8, var(--gold) 45%, var(--red) 100%);
       box-shadow: 0 0 26px var(--gold), 0 0 70px rgba(255, 90, 30, 0.45);
       display: flex; align-items: center; justify-content: center;
-      font-family: Orbitron, sans-serif; font-weight: 900; font-size: 15px; color: #2a0d05; letter-spacing: 0.1em;
+      font-family: Orbitron, sans-serif; font-weight: 900; font-size: 11px; color: #2a0d05; letter-spacing: 0.1em;
       animation: pulse 2.4s ease-in-out infinite;
     }
-    .ring { position: absolute; inset: 24px; border-radius: 50%; border: 2px dashed rgba(255, 198, 77, 0.5); animation: spin 22s linear infinite; }
+    .ring { position: absolute; inset: 14px; border-radius: 50%; border: 2px dashed rgba(255, 198, 77, 0.5); animation: spin 22s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes pulse { 50% { box-shadow: 0 0 40px var(--gold), 0 0 100px rgba(255, 90, 30, 0.6); } }
 
-    h1 { font-family: Orbitron, sans-serif; font-weight: 900; text-align: center; letter-spacing: 0.3em; margin: 8px 0 2px; font-size: 22px; background: linear-gradient(90deg, var(--gold), #fff1d6, var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .sub { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 22px; }
+    h1 { font-family: Orbitron, sans-serif; font-weight: 900; text-align: center; letter-spacing: 0.3em; margin: 6px 0 0; font-size: 18px; background: linear-gradient(90deg, var(--gold), #fff1d6, var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .sub { text-align: center; color: var(--muted); font-size: 12px; margin: 0 0 12px; }
 
     /* ---- link tiles ---- */
     .label-row { display: flex; align-items: center; gap: 10px; font-size: 10px; color: var(--muted); margin: 6px 0 12px; }
     .label-row::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--gold-soft), transparent); }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-    @media (min-width: 560px) { .grid { grid-template-columns: 1fr 1fr; } }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .tile {
-      position: relative; display: flex; gap: 14px; align-items: center; overflow: hidden;
-      min-height: 80px; padding: 16px 16px 16px 18px; color: inherit; text-decoration: none;
+      position: relative; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; overflow: hidden;
+      min-height: 112px; padding: 12px 12px 12px 16px; color: inherit; text-decoration: none;
       cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none;
       background: var(--panel); border: 1px solid rgba(255, 198, 77, 0.35);
       clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
@@ -117,20 +116,20 @@
     .tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(var(--gold), var(--red)); }
     .tile > * { pointer-events: none; }
     .tile:hover, .tile:focus-visible { border-color: var(--gold); box-shadow: 0 0 26px rgba(255, 159, 28, 0.35); outline: none; }
-    .num { font-family: Orbitron, sans-serif; font-size: 11px; color: var(--red); min-width: 22px; }
+    .num { position: absolute; top: 10px; right: 12px; font-family: Orbitron, sans-serif; font-size: 10px; color: var(--red); }
     .icon {
-      flex: 0 0 52px; height: 52px; display: flex; align-items: center; justify-content: center; font-size: 26px;
+      flex: 0 0 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 21px;
       background: radial-gradient(circle, rgba(255, 198, 77, 0.25), transparent 70%); border: 1px solid rgba(255, 198, 77, 0.4); border-radius: 50%;
     }
     .info { min-width: 0; flex: 1; }
     .tag { font-family: Orbitron, sans-serif; font-size: 9px; letter-spacing: 0.2em; color: var(--gold-2); }
-    .title { font-weight: 600; font-size: 17px; margin: 2px 0; }
-    .desc { color: var(--muted); font-size: 13px; line-height: 1.4; }
-    .arrow { font-family: Orbitron, sans-serif; color: var(--gold); font-size: 20px; }
+    .title { font-weight: 600; font-size: 15px; margin: 0; }
+    .desc { color: var(--muted); font-size: 11px; line-height: 1.35; }
+    .arrow { display: none; }
     .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 24px; border: 1px dashed var(--gold-soft); }
 
     /* ---- ticker ---- */
-    .ticker { pointer-events: none; margin-top: 26px; overflow: hidden; white-space: nowrap; border-top: 1px solid var(--gold-soft); border-bottom: 1px solid var(--gold-soft); padding: 8px 0; font-family: Orbitron, sans-serif; font-size: 10px; color: var(--muted); letter-spacing: 0.2em; }
+    .ticker { pointer-events: none; margin-top: 12px; overflow: hidden; white-space: nowrap; border-top: 1px solid var(--gold-soft); border-bottom: 1px solid var(--gold-soft); padding: 8px 0; font-family: Orbitron, sans-serif; font-size: 10px; color: var(--muted); letter-spacing: 0.2em; }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
   </style>
 </head>
@@ -157,7 +156,6 @@
     <h1>CONTROL HUB</h1>
     <p class="sub">เลือกระบบที่ต้องการเปิด</p>
 
-    <div class="label-row mono">SYSTEMS</div>
     <div id="grid" class="grid"></div>
 
     <div class="ticker mono"><span id="ticker">ALL SYSTEMS NOMINAL · TRAVEL · ENERGY · CLOCK · BOM ·</span></div>
@@ -181,7 +179,7 @@
       links.forEach(function (l, i) {
         // จุดบนเรดาร์ กระจายตามจำนวนลิงก์
         var angle = (i / Math.max(links.length, 1)) * Math.PI * 2 - Math.PI / 2;
-        var r = 96;
+        var r = 62;
         var b = document.createElement('div');
         b.className = 'blip';
         b.style.setProperty('--x', Math.round(Math.cos(angle) * r));
