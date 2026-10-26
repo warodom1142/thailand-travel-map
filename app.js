@@ -73,6 +73,7 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 if (matchMedia('(min-width: 720px)').matches) L.control.zoom({ position: 'bottomleft' }).addTo(map);
 const markerLayer = L.layerGroup().addTo(map);
 const myLayer = L.layerGroup().addTo(map);
+const previewLayer = L.layerGroup().addTo(map); // หมุดชั่วคราวของพิกัดที่กำลังกรอก (ยังไม่บันทึก)
 
 // ---------- ตำแหน่งของฉัน ----------
 // หาตำแหน่งจาก GPS แล้วเลื่อนแผนที่ไปที่นั่น พร้อมวาดจุดและวงความแม่นยำ
@@ -125,6 +126,7 @@ function show(id) {
 }
 
 function hide(id) {
+  if (id === 'editor') previewLayer.clearLayers();
   const el = $(id);
   el.classList.remove('open');
   clearTimeout(el._t);
@@ -812,6 +814,7 @@ async function applyCoords(src) {
   }
   $(input).value = '';
   if (input === 'f-gmap') syncGmapClear();
+  showPreview(ll.lat, ll.lng);
 
   if (isOpen('editor')) {
     // แก้ไขสถานที่เดิม: เปลี่ยนพิกัดในฟอร์มเลย
@@ -825,6 +828,23 @@ async function applyCoords(src) {
     openEditor(null, { lat: ll.lat, lng: ll.lng });
   }
 }
+
+// แสดงหมุดชั่วคราวที่พิกัดใหม่ และเลื่อนแผนที่ไปหา
+function showPreview(lat, lng) {
+  previewLayer.clearLayers();
+  const icon = L.divIcon({ className: 'preview-pin', html: '<span>📍</span>', iconSize: [36, 36], iconAnchor: [18, 30] });
+  L.marker([lat, lng], { icon, interactive: false }).addTo(previewLayer);
+  map.panTo([lat, lng]);
+}
+
+// ถ้าแก้ละติจูด/ลองจิจูดเองในฟอร์ม ให้หมุดชั่วคราวตามไปด้วย
+function previewFromForm() {
+  const lat = Number(form.elements.lat.value);
+  const lng = Number(form.elements.lng.value);
+  if (Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0) showPreview(lat, lng);
+}
+form.elements.lat.addEventListener('change', previewFromForm);
+form.elements.lng.addEventListener('change', previewFromForm);
 
 function pasteCoords(src) {
   const { input, hint } = COORD_SOURCES[src];

@@ -848,3 +848,15 @@ select.select {
   cursor: grab;
 }
 .unlock-knob:focus-visible { outline: 3px solid #ffd27a; outline-offset: 2px; }
+
+/* ---------- หมุดชั่วคราวของพิกัดที่กำลังกรอก ---------- */
+.preview-pin { background: none; border: 0; }
+.preview-pin span {
+  display: block;
+  font-size: 30px;
+  line-height: 1;
+  text-align: center;
+  filter: drop-shadow(0 0 6px #2563eb) drop-shadow(0 2px 4px rgba(0,0,0,.35));
+  animation: preview-bob 1.2s ease-in-out infinite;
+}
+@keyframes preview-bob { 50% { transform: translateY(-5px); } }

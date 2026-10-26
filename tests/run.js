@@ -335,6 +335,7 @@ function loadApp(gas) {
     markers: () => layers[0].markers,
     viewCalls,
     myMarkers: () => layers[1]?.markers || [],
+    previewMarkers: () => layers[2]?.markers || [],
     get: name => vm.runInContext(name, sandbox),
     // ข้อความที่แอพเขียนด้วย textContent (สถานะ, ข้อผิดพลาด) หรือ innerHTML
     html: id => els[id]?.innerHTML || els[id]?.textContent || '',
@@ -450,6 +451,7 @@ async function main() {
   await app.els['ed-apply'].dispatch('click');
   await flush();
   check('ตอนแก้ไขใช้ช่องพิกัดในฟอร์มเปลี่ยนพิกัดได้', app.fields.lat.value === '17.900000' && app.cls('editor').contains('open'), app.fields.lat.value);
+  check('พิกัดที่กรอกแสดงเป็นหมุดชั่วคราวบนแผนที่', app.previewMarkers().some(m => Math.abs(m.ll[0] - 17.9) < 1e-6), JSON.stringify(app.previewMarkers().map(m => m.ll)));
   // วางลิงก์ Google Maps แล้วได้พิกัด
   const parsed = (txt) => vm.runInContext(`parseGmapCoords(${JSON.stringify(txt)})`, app.sb);
   check('อ่านพิกัดจาก @lat,lng ของลิงก์ Google Maps', parsed('https://www.google.com/maps/@18.7883,98.9853,17z')?.lat === 18.7883);
