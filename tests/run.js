@@ -208,7 +208,7 @@ function loadApp(gas) {
 
   els.form = mk('form');
   // สถานะเริ่มต้นตาม index.html (มี attribute hidden)
-  for (const id of ['detail', 'editor', 'lightbox', 'pick-banner', 'stay-box']) els[id].hidden = true;
+  for (const id of ['detail', 'editor', 'lightbox', 'pick-banner', 'stay-box', 'alert', 'busy']) els[id].hidden = true;
   const fields = {};
   els.form.elements = new Proxy({}, { get: (_, name) => (fields[name] ||= mk(String(name))) });
 
@@ -536,6 +536,9 @@ async function main() {
   app.fields.lat.value = '';
   await app.els.form.dispatch('submit', {});
   check('ไม่มีพิกัด แจ้งเตือน', app.html('form-error').includes('พิกัด'), app.html('form-error'));
+  check('ข้อผิดพลาดแสดงเป็นป็อปอัปกลางจอ', app.els.alert.hidden === false && app.html('alert-msg').includes('พิกัด'), app.html('alert-msg'));
+  app.els['alert-ok'].dispatch('click');
+  check('กดตกลงแล้วปิดป็อปอัป', app.els.alert.hidden === true);
   app.fields.lat.value = '';
   app.els['btn-cancel'].dispatch('click');
   await sleep(340);
