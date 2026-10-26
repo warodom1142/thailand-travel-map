@@ -793,39 +793,62 @@ async function resolvePlusCode(text) {
   return olcNearest(code, ref);
 }
 
-async function applyGmapLink() {
-  const text = $('f-gmap').value;
-  const hint = $('gmap-hint');
+// ใช้ได้ทั้งตอนปักหมุดสถานที่ใหม่ (แถบปักหมุด) และตอนแก้ไขสถานที่ (ในฟอร์ม)
+const COORD_SOURCES = {
+  pick: { input: 'f-gmap', hint: 'gmap-hint' },
+  edit: { input: 'ed-gmap', hint: 'ed-hint' },
+};
+
+async function applyCoords(src) {
+  const { input, hint } = COORD_SOURCES[src];
+  const text = $(input).value;
+  const hintEl = $(hint);
   const ll = parseGmapCoords(text) || await resolvePlusCode(text);
   if (!ll) {
-    hint.textContent = /goo\.gl|maps\.app/.test(text)
+    hintEl.textContent = /goo\.gl|maps\.app/.test(text)
       ? 'ลิงก์สั้นอ่านพิกัดไม่ได้ ให้เปิดลิงก์ในเบราว์เซอร์ แล้วคัดลอก URL เต็มมาวาง'
       : 'หาพิกัดไม่เจอ ลองใส่ Plus Code เช่น G8V7+RP สวนผึ้ง หรือวางลิงก์เต็มจาก Google Maps';
     return;
   }
-  // ได้พิกัดแล้ว เปิดฟอร์มเพิ่มสถานที่ที่ตำแหน่งนั้นเลย
-  $('f-gmap').value = '';
-  syncGmapClear();
-  setPick(false);
-  openEditor(null, { lat: ll.lat, lng: ll.lng });
+  $(input).value = '';
+  if (input === 'f-gmap') syncGmapClear();
+
+  if (isOpen('editor')) {
+    // แก้ไขสถานที่เดิม: เปลี่ยนพิกัดในฟอร์มเลย
+    form.elements.lat.value = ll.lat.toFixed(6);
+    form.elements.lng.value = ll.lng.toFixed(6);
+    hintEl.textContent = `ตั้งพิกัดใหม่แล้ว ${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
+    await detectProvince(ll, true);
+  } else {
+    // สถานที่ใหม่: เปิดฟอร์มที่ตำแหน่งนั้น
+    setPick(false);
+    openEditor(null, { lat: ll.lat, lng: ll.lng });
+  }
 }
 
-$('btn-gmap').addEventListener('click', applyGmapLink);
+function pasteCoords(src) {
+  const { input, hint } = COORD_SOURCES[src];
+  navigator.clipboard.readText().then(t => {
+    $(input).value = String(t || '').trim();
+    if (input === 'f-gmap') syncGmapClear();
+    $(hint).textContent = 'วางแล้ว กด "ใช้พิกัด"';
+  }).catch(() => {
+    $(hint).textContent = 'วางจากคลิปบอร์ดไม่ได้ กดค้างในช่องแล้วเลือก "วาง"';
+    $(input).focus();
+  });
+}
+
+$('btn-gmap').addEventListener('click', () => applyCoords('pick'));
 $('f-gmap').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); applyGmapLink(); }
+  if (e.key === 'Enter') { e.preventDefault(); applyCoords('pick'); }
 });
-// วางจากคลิปบอร์ดลงช่องพิกัด (ยังไม่ใช้ทันที ให้กด "ใช้พิกัด")
-$('btn-paste').addEventListener('click', async () => {
-  try {
-    const t = await navigator.clipboard.readText();
-    $('f-gmap').value = String(t || '').trim();
-    syncGmapClear();
-    $('gmap-hint').textContent = 'วางแล้ว กด "ใช้พิกัด"';
-  } catch {
-    $('gmap-hint').textContent = 'วางจากคลิปบอร์ดไม่ได้ กดค้างในช่องแล้วเลือก "วาง"';
-    $('f-gmap').focus();
-  }
+$('btn-paste').addEventListener('click', () => pasteCoords('pick'));
+
+$('ed-apply').addEventListener('click', () => applyCoords('edit'));
+$('ed-gmap').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); applyCoords('edit'); }
 });
+$('ed-paste').addEventListener('click', () => pasteCoords('edit'));
 
 $('btn-geo').addEventListener('click', () => {
   navigator.geolocation?.getCurrentPosition(

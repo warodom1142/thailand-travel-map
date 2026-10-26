@@ -143,8 +143,14 @@
           <div id="photo-grid" class="photo-grid"></div>
         </div>
 
-        <details class="section coords">
+        <details class="section coords" open>
           <summary class="label">พิกัด</summary>
+          <div class="search-row">
+            <input id="ed-gmap" class="field" placeholder="เช่น G8V7+RP สวนผึ้ง หรือวางพิกัด" autocomplete="off" autocapitalize="characters">
+            <button type="button" id="ed-paste" class="pill">วาง</button>
+            <button type="button" id="ed-apply" class="pill">ใช้พิกัด</button>
+          </div>
+          <small id="ed-hint" class="hint">ใส่ Plus Code หรือลิงก์ Google Maps เพื่อแก้พิกัด หรือกรอกละติจูด/ลองจิจูดด้านล่าง</small>
           <button type="button" id="btn-geo" class="pill">📍 ใช้ตำแหน่งปัจจุบัน</button>
           <div class="row2">
             <input name="lat" type="number" step="any" class="field" placeholder="ละติจูด">
