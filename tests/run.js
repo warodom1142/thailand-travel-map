@@ -452,6 +452,10 @@ async function main() {
   check('อ่านพิกัดที่วางตรงๆ', parsed('18.79, 98.98')?.lng === 98.98);
   check('ลิงก์ที่ไม่มีพิกัดได้ null', parsed('https://maps.app.goo.gl/abc123') === null);
   check('พิกัดนอกช่วงถูกปฏิเสธ', parsed('@95.0,200.0') === null);
+  const near = vm.runInContext(`olcNearest('G8V7+RP', { lat: 13.59, lng: 99.47 })`, app.sb);
+  check('Plus Code G8V7+RP ใกล้สวนผึ้งได้พิกัดถูกต้อง', Math.abs(near.lat - 13.5445625) < 1e-6 && Math.abs(near.lng - 99.3143125) < 1e-6, JSON.stringify(near));
+  const full = vm.runInContext(`olcFull('7M5XG8V7+RP')`, app.sb);
+  check('รหัสเต็มให้พิกัดเดียวกับรหัสสั้น', Math.abs(full.lat - near.lat) < 1e-9 && Math.abs(full.lng - near.lng) < 1e-9, JSON.stringify(full));
   app.els['f-gmap'].value = 'https://www.google.com/maps/@17.4,100.4,15z';
   await app.els['btn-gmap'].dispatch('click');
   await flush();

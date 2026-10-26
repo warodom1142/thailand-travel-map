@@ -669,7 +669,7 @@ function openEditor(place = null, latlng = null) {
 
   $('form-error').textContent = '';
   $('f-gmap').value = '';
-  $('gmap-hint').textContent = 'วางลิงก์ที่มีพิกัด หรือพิกัดแบบ 18.79, 98.98';
+  $('gmap-hint').textContent = 'ใส่ Plus Code จาก Google Maps เช่น G8V7+RP แล้วเติมชื่ออำเภอหรือจังหวัดต่อท้าย เช่น "สวนผึ้ง ราชบุรี" ก็ได้ หรือวางลิงก์ Google Maps หรือพิกัดแบบ 18.79, 98.98';
   $('btn-gmap-show').hidden = true;
   gmapPoint = null;
   show('editor');
@@ -708,18 +708,78 @@ function parseGmapCoords(text) {
   return null;
 }
 
+// ---- Plus Code (Open Location Code) ----
+const OLC_ALPHABET = '23456789CFGHJMPQRVWX';
+
+// รหัสเต็ม 8 ตัวก่อน '+' แปลงเป็นพิกัดของกลางช่อง
+function olcFull(code) {
+  const c = String(code).toUpperCase().replace('+', '');
+  const d = [...c].map(ch => OLC_ALPHABET.indexOf(ch));
+  if (d.length < 2 || d.some(v => v < 0)) return null;
+  let lat = -90, lng = -180, res = 20, cell = 20;
+  for (let k = 0; k < 5 && 2 * k + 1 < d.length; k++) {
+    lat += d[2 * k] * res;
+    lng += d[2 * k + 1] * res;
+    cell = res;
+    res /= 20;
+  }
+  return { lat: lat + cell / 2, lng: lng + cell / 2 };
+}
+
+// รหัสสั้น (เช่น G8V7+RP) ต้องเติม 4 ตัวหน้าจากจุดอ้างอิง เลือกช่องที่ใกล้จุดอ้างอิงที่สุด
+function olcNearest(shortCode, ref) {
+  const code = String(shortCode).toUpperCase();
+  const prefixOf = (lat0, lng0) => {
+    const la = lat0 + 90, ln = lng0 + 180;
+    return OLC_ALPHABET[Math.floor(la / 20)] + OLC_ALPHABET[Math.floor(ln / 20)]
+      + OLC_ALPHABET[Math.floor(la % 20)] + OLC_ALPHABET[Math.floor(ln % 20)];
+  };
+  let best = null;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const p = olcFull(prefixOf(Math.floor(ref.lat) + dy, Math.floor(ref.lng) + dx) + code);
+      if (!p) continue;
+      const dist = Math.hypot(p.lat - ref.lat, p.lng - ref.lng);
+      if (!best || dist < best.dist) best = { ...p, dist };
+    }
+  }
+  return best ? { lat: best.lat, lng: best.lng } : null;
+}
+
+// หาพิกัดจาก Plus Code ในข้อความ (รหัสสั้นจะใช้ชื่อสถานที่ต่อท้ายเป็นจุดอ้างอิง)
+async function resolvePlusCode(text) {
+  const m = /([23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{0,3})/i.exec(text);
+  if (!m) return null;
+  const code = m[1].toUpperCase();
+  const digitsBeforePlus = code.split('+')[0].length;
+  if (digitsBeforePlus >= 8) return olcFull(code);
+  if (digitsBeforePlus !== 4) return null;
+
+  const c = map.getCenter();
+  let ref = { lat: c.lat, lng: c.lng };
+  const place = text.slice(m.index + m[1].length).trim();
+  if (place) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycode=th&accept-language=th&limit=1&q=${encodeURIComponent(place)}`;
+      const list = await (await fetch(url)).json();
+      if (Array.isArray(list) && list[0]) ref = { lat: Number(list[0].lat), lng: Number(list[0].lon) };
+    } catch { /* ใช้จุดกลางแผนที่แทน */ }
+  }
+  return olcNearest(code, ref);
+}
+
 let gmapPoint = null;
 
 async function applyGmapLink() {
   const text = $('f-gmap').value;
   const hint = $('gmap-hint');
-  const ll = parseGmapCoords(text);
+  const ll = parseGmapCoords(text) || await resolvePlusCode(text);
   if (!ll) {
     gmapPoint = null;
     $('btn-gmap-show').hidden = true;
     hint.textContent = /goo\.gl|maps\.app/.test(text)
       ? 'ลิงก์สั้นอ่านพิกัดไม่ได้ ให้เปิดลิงก์ในเบราว์เซอร์ แล้วคัดลอก URL เต็มมาวาง'
-      : 'หาพิกัดในลิงก์นี้ไม่เจอ ลองวางลิงก์เต็มจาก Google Maps หรือพิกัดแบบ 18.79, 98.98';
+      : 'หาพิกัดไม่เจอ ลองใส่ Plus Code เช่น G8V7+RP สวนผึ้ง ราชบุรี หรือวางลิงก์เต็มจาก Google Maps';
     return;
   }
   gmapPoint = ll;
