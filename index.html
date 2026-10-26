@@ -38,6 +38,7 @@
     <div class="search">
       <span>⌕</span>
       <input id="search" type="search" placeholder="ค้นหาสถานที่หรือจังหวัด" enterkeyhint="search">
+      <button id="search-clear" class="clear-btn" type="button" aria-label="ล้างการค้นหา" hidden>✕</button>
     </div>
     <div id="chips" class="chips"></div>
   </div>
@@ -50,6 +51,7 @@
     </div>
     <div class="pick-row coords-row">
       <input id="f-gmap" class="field" placeholder="หรือวางพิกัด เช่น G8V7+RP สวนผึ้ง" autocomplete="off" autocapitalize="characters">
+      <button id="gmap-clear" class="clear-btn dark" type="button" aria-label="ล้างพิกัด" hidden>✕</button>
       <button id="btn-paste" type="button">วาง</button>
       <button id="btn-gmap" type="button">ใช้พิกัด</button>
     </div>
