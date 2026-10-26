@@ -130,6 +130,26 @@
 
     /* ---- ticker ---- */
     .ticker { pointer-events: none; margin-top: 12px; overflow: hidden; white-space: nowrap; border-top: 1px solid var(--gold-soft); border-bottom: 1px solid var(--gold-soft); padding: 8px 0; font-family: Orbitron, sans-serif; font-size: 10px; color: var(--muted); letter-spacing: 0.2em; }
+    /* ---- REPULSOR DRILL (เกมเล็ก) ---- */
+    .game { margin-top: 14px; padding: 10px; background: var(--panel); border: 1px solid var(--gold-soft); clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px); }
+    .game-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-family: Orbitron, sans-serif; font-size: 10px; letter-spacing: 0.15em; color: var(--gold); }
+    .game-btn { font-family: Orbitron, sans-serif; font-size: 10px; letter-spacing: 0.15em; padding: 7px 10px; background: linear-gradient(90deg, var(--red), var(--gold-2)); color: #1a0803; border: 0; cursor: pointer; clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+    .field { position: relative; margin-top: 8px; height: 230px; overflow: hidden; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+      background:
+        radial-gradient(circle at 50% 50%, transparent 0 60px, rgba(255, 198, 77, 0.08) 60px 61px, transparent 61px),
+        repeating-linear-gradient(0deg, rgba(255, 198, 77, 0.06) 0 1px, transparent 1px 22px),
+        repeating-linear-gradient(90deg, rgba(255, 198, 77, 0.06) 0 1px, transparent 1px 22px),
+        rgba(10, 5, 3, 0.7);
+      border: 1px solid rgba(255, 198, 77, 0.2); }
+    .drone { position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; border: 2px solid var(--red); background: rgba(224, 38, 45, 0.22); box-shadow: 0 0 14px rgba(224, 38, 45, 0.6); cursor: crosshair; animation: appear .18s ease-out; }
+    .drone::before, .drone::after { content: ""; position: absolute; background: var(--gold); }
+    .drone::before { left: 50%; top: 6px; bottom: 6px; width: 1px; margin-left: -0.5px; opacity: 0.7; }
+    .drone::after { top: 50%; left: 6px; right: 6px; height: 1px; margin-top: -0.5px; opacity: 0.7; }
+    .drone.hit { border-color: var(--gold); background: rgba(255, 198, 77, 0.6); animation: boom .3s ease-out forwards; pointer-events: none; }
+    @keyframes appear { from { transform: scale(0.3); opacity: 0; } }
+    @keyframes boom { to { transform: scale(2.2); opacity: 0; } }
+    .game-foot { display: flex; justify-content: space-between; margin-top: 8px; font-family: Orbitron, sans-serif; font-size: 9px; letter-spacing: 0.15em; color: var(--muted); }
+    .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: rgba(10, 5, 3, 0.7); font-family: Orbitron, sans-serif; font-size: 12px; letter-spacing: 0.15em; color: var(--gold); text-align: center; }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
   </style>
 </head>
@@ -159,9 +179,115 @@
     <div id="grid" class="grid"></div>
 
     <div class="ticker mono"><span id="ticker">ALL SYSTEMS NOMINAL · TRAVEL · ENERGY · CLOCK · BOM ·</span></div>
+
+    <section class="game" aria-label="เกมฝึกยิง">
+      <div class="game-head">
+        <span>REPULSOR DRILL</span>
+        <span id="g-time">00:30</span>
+        <span id="g-score">SCORE 0</span>
+        <button id="g-start" class="game-btn" type="button">START</button>
+      </div>
+      <div id="g-field" class="field">
+        <div id="g-over" class="overlay">
+          <span>แตะ START เพื่อเริ่มฝึก</span>
+          <small>แตะเป้าก่อนหายไป — 30 วินาที</small>
+        </div>
+      </div>
+      <div class="game-foot">
+        <span>HIT <span id="g-hits">0</span></span>
+        <span>MISS <span id="g-miss">0</span></span>
+      </div>
+    </section>
   </main>
 
   <script src="links.js"></script>
+  <script>
+    (function () {
+      var field = document.getElementById('g-field');
+      var over = document.getElementById('g-over');
+      var startBtn = document.getElementById('g-start');
+      var scoreEl = document.getElementById('g-score');
+      var timeEl = document.getElementById('g-time');
+      var hitsEl = document.getElementById('g-hits');
+      var missEl = document.getElementById('g-miss');
+      var ROUND = 30; // วินาที
+      var state = null;
+
+      function setOverlay(title, sub) {
+        over.innerHTML = '';
+        var a = document.createElement('span'); a.textContent = title;
+        var b = document.createElement('small'); b.textContent = sub;
+        over.appendChild(a); over.appendChild(b);
+        over.style.display = 'flex';
+      }
+
+      function clearTargets() {
+        field.querySelectorAll('.drone').forEach(function (d) { d.remove(); });
+      }
+
+      function spawn() {
+        if (!state || !state.running) return;
+        var d = document.createElement('div');
+        d.className = 'drone';
+        var pad = 30;
+        var w = field.clientWidth - pad * 2, h = field.clientHeight - pad * 2;
+        d.style.left = (pad + Math.random() * Math.max(w, 1)) + 'px';
+        d.style.top = (pad + Math.random() * Math.max(h, 1)) + 'px';
+        field.appendChild(d);
+        var life = Math.max(700, 1300 - state.hits * 25); // ยิ่งยิงโดน เป้ายิ่งอยู่สั้นลง
+        var t = setTimeout(function () {
+          if (d.parentNode && !d.classList.contains('hit')) {
+            d.remove();
+            state.miss++;
+            missEl.textContent = String(state.miss);
+          }
+        }, life);
+        state.timers.push(t);
+      }
+
+      field.addEventListener('pointerdown', function (e) {
+        var d = e.target.closest && e.target.closest('.drone');
+        if (!d || !state || !state.running || d.classList.contains('hit')) return;
+        d.classList.add('hit');
+        state.hits++;
+        state.score += 10;
+        hitsEl.textContent = String(state.hits);
+        scoreEl.textContent = 'SCORE ' + state.score;
+        setTimeout(function () { d.remove(); }, 320);
+      });
+
+      function end() {
+        if (!state) return;
+        state.running = false;
+        clearInterval(state.spawnTimer);
+        clearInterval(state.clock);
+        state.timers.forEach(clearTimeout);
+        clearTargets();
+        setOverlay('ฝึกจบแล้ว · SCORE ' + state.score, 'แตะ START เพื่อเล่นอีกครั้ง');
+        startBtn.textContent = 'AGAIN';
+      }
+
+      startBtn.addEventListener('click', function () {
+        if (state && state.running) return;
+        end();
+        clearTargets();
+        state = { running: true, score: 0, hits: 0, miss: 0, left: ROUND, timers: [] };
+        scoreEl.textContent = 'SCORE 0';
+        hitsEl.textContent = '0';
+        missEl.textContent = '0';
+        timeEl.textContent = '00:' + String(ROUND).padStart(2, '0');
+        over.style.display = 'none';
+        startBtn.textContent = 'START';
+        state.spawnTimer = setInterval(spawn, 650);
+        state.clock = setInterval(function () {
+          state.left--;
+          timeEl.textContent = '00:' + String(Math.max(state.left, 0)).padStart(2, '0');
+          if (state.left <= 0) end();
+        }, 1000);
+        spawn();
+      });
+    })();
+  </script>
   <script>
     (function () {
       var grid = document.getElementById('grid');
