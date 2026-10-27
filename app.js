@@ -1004,7 +1004,20 @@ function postWithProgress(action, payload, onProgress, signal) {
       try { j = JSON.parse(xhr.responseText); } catch { return reject(new Error('ตอบกลับจากเซิร์ฟเวอร์ไม่ถูกต้อง')); }
       if (j.ok) { onProgress(1); resolve(j); } else reject(new Error(j.error || 'เกิดข้อผิดพลาด'));
     };
-    xhr.onerror = () => reject(new Error('อัปโหลดไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่'));
+    // XHR ล้มเหลวกลางทาง (บาง iPhone/เครือข่ายมือถือ) ให้ลองส่งอีกครั้งด้วย fetch ก่อนยอมแพ้
+    xhr.onerror = () => {
+      fetch(cfg.API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, secret: cfg.SECRET, ...payload }),
+      })
+        .then(r => r.json())
+        .then(j => {
+          if (j.ok) { onProgress(1); resolve(j); }
+          else reject(new Error(j.error || 'เกิดข้อผิดพลาด'));
+        })
+        .catch(() => reject(new Error('อัปโหลดไม่สำเร็จ เครือข่ายขาดช่วง กดบันทึกอีกครั้ง รูปที่อัปแล้วจะไม่ต้องอัปซ้ำ')));
+    };
     xhr.onabort = () => { const e = new Error('ยกเลิกแล้ว'); e.name = 'AbortError'; reject(e); };
     signal?.addEventListener('abort', () => xhr.abort());
     xhr.send(JSON.stringify({ action, secret: cfg.SECRET, ...payload }));
