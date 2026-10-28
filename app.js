@@ -1058,8 +1058,30 @@ function releaseAwake() {
   try { wakeLock?.release(); } catch { /* ไม่เป็นไร */ }
   wakeLock = null;
 }
+// ---- สลับแอประหว่างบันทึก: ให้อัปต่อในพื้นหลังเท่าที่ iOS ยอม และถ้าขาดช่วงให้บันทึกต่อเองเมื่อกลับมา ----
+let lastHiddenAt = 0;
+let saveStartedAt = 0;
+let resumeTries = 0;
+let resumeAfterReturn = false;
+
+function resumeSave() {
+  if (!isOpen('editor') || $('btn-save').disabled) return;
+  if (resumeTries >= 3) return;
+  resumeTries++;
+  if (form.requestSubmit) form.requestSubmit();
+  else form.dispatchEvent(new Event('submit', { cancelable: true }));
+}
+
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && $('btn-save').disabled) keepAwake();
+  if (document.visibilityState === 'hidden') {
+    lastHiddenAt = Date.now();
+    return;
+  }
+  if ($('btn-save').disabled) keepAwake();
+  if (resumeAfterReturn) {
+    resumeAfterReturn = false;
+    setTimeout(resumeSave, 500);
+  }
 });
 
 // ---- ยกเลิกการอัปโหลดด้วยการเลื่อนปุ่ม ----
@@ -1157,6 +1179,7 @@ form.addEventListener('submit', async e => {
   }
 
   setSaving(true);
+  saveStartedAt = Date.now();
   showBusy('กำลังเตรียมบันทึก…');
   await keepAwake();
   upload = { ctl: null, cancelled: false };
@@ -1226,6 +1249,7 @@ form.addEventListener('submit', async e => {
       await api('add', { place }, true);
     }
     clearPending();
+    resumeTries = 0;
     showBusy('บันทึกแล้ว ✓');
     await sleep(500);
     hideBusy();
@@ -1237,6 +1261,14 @@ form.addEventListener('submit', async e => {
       await discardPending(work);
       clearPending();
       return showFormError('ยกเลิกการอัปโหลดแล้ว รูปที่อัปไปแล้วถูกลบ');
+    }
+    // ขาดช่วงเพราะสลับแอป: บันทึกต่อให้เองโดยไม่แจ้งเตือน (รูปที่อัปแล้วจะไม่อัปซ้ำ)
+    if (lastHiddenAt >= saveStartedAt && resumeTries < 3) {
+      hideBusy();
+      setSaving(false);
+      if (document.visibilityState === 'visible') setTimeout(resumeSave, 800);
+      else resumeAfterReturn = true;
+      return;
     }
     const kept = work && Object.keys(work.uploads).length;
     showFormError(kept ? `${err.message} — รูปที่อัปโหลดแล้วถูกเก็บไว้ กดบันทึกอีกครั้งเพื่อทำต่อ` : err.message);
