@@ -501,6 +501,37 @@ body.sheet-open .fab { opacity: 0; pointer-events: none; transform: scale(0.8); 
   font-size: 16px;
   backdrop-filter: blur(6px);
 }
+.lb-strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + 58px);
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+  padding: 6px 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+}
+.lb-strip::-webkit-scrollbar { display: none; }
+.lb-strip[hidden] { display: none !important; }
+.lb-thumb {
+  flex: 0 0 auto;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #1f1f1f;
+  opacity: 0.55;
+  transition: opacity .2s, border-color .2s;
+}
+.lb-thumb.active { border-color: #fff; opacity: 1; }
+.lb-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lb-thumb .vid { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: #fff; font-size: 18px; }
 .lb-count {
   position: absolute;
   bottom: calc(env(safe-area-inset-bottom) + 18px);

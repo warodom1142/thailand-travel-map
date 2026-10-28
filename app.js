@@ -137,6 +137,7 @@ function hide(id) {
 const isOpen = id => $(id).classList.contains('open');
 const lb = $('lightbox');
 const lbTrack = $('lb-track');
+const lbStrip = $('lb-strip');
 
 const lbState = { urls: [], index: 0, zs: [], pts: new Map(), drag: null, pinch: null, dragX: 0, lastTap: 0 };
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -158,6 +159,11 @@ function lbApply(animated) {
     }
   });
   $('lb-count').textContent = urls.length > 1 ? `${index + 1} / ${urls.length}` : '';
+  [...lbStrip.children].forEach((btn, i) => {
+    const on = i === index;
+    btn.classList.toggle('active', on);
+    if (on && btn.scrollIntoView) btn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  });
 }
 
 function openLightbox(urls, start = 0) {
@@ -166,6 +172,11 @@ function openLightbox(urls, start = 0) {
   lbTrack.innerHTML = urls.map(u => (isDriveVideo(u)
     ? `<div class="lb-slide"><iframe src="${esc(u)}" allow="autoplay; fullscreen" allowfullscreen></iframe></div>`
     : `<div class="lb-slide"><img src="${esc(u)}" alt="" draggable="false"></div>`)).join('');
+  // แถบพรีวิวทุกรูป แตะเพื่อเลือกดู
+  lbStrip.innerHTML = urls.map((u, i) => `<button type="button" class="lb-thumb" data-i="${i}" aria-label="รูปที่ ${i + 1}">${
+    isDriveVideo(u) ? '<span class="vid">▶</span>' : `<img src="${esc(u)}" alt="" loading="lazy">`
+  }</button>`).join('');
+  lbStrip.hidden = urls.length < 2;
   lb.hidden = false;
   lbApply(false);
 }
@@ -196,8 +207,13 @@ function toggleZoom() {
   lbApply(true);
 }
 
+lbStrip.addEventListener('click', e => {
+  const btn = e.target.closest && e.target.closest('.lb-thumb');
+  if (btn) goTo(Number(btn.dataset.i));
+});
+
 lb.addEventListener('pointerdown', e => {
-  if (e.target.closest('.lb-close')) return;
+  if (e.target.closest('.lb-close') || e.target.closest('.lb-strip')) return;
   lbState.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
   const z = lbState.zs[lbState.index];
   if (lbState.pts.size === 1) {
